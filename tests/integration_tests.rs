@@ -383,7 +383,11 @@ mod message_parsing_tests {
 
         let result = FixMessage::from_fix_string(fix_string);
 
-        assert!(result.is_ok(), "Failed to parse FIX message: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to parse FIX message: {:?}",
+            result.err()
+        );
 
         let message = result.unwrap();
 
@@ -404,7 +408,10 @@ mod message_parsing_tests {
         assert_eq!(message.checksum, "150");
 
         // Verify additional fields are captured
-        assert_eq!(message.get_field(131), Some(&"Q-EURGBP-BUY-3357-636613669639680362".to_string()));
+        assert_eq!(
+            message.get_field(131),
+            Some(&"Q-EURGBP-BUY-3357-636613669639680362".to_string())
+        );
         assert_eq!(message.get_field(146), Some(&"1".to_string()));
         assert_eq!(message.get_field(15), Some(&"EUR".to_string()));
         assert_eq!(message.get_field(64), Some(&"20180508".to_string()));
