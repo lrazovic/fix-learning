@@ -373,6 +373,47 @@ mod trading_workflow_tests {
 }
 
 #[cfg(test)]
+mod message_parsing_tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_real_fix_message() {
+        // Test parsing a real FIX message from https://robertwray.co.uk/blog/the-anatomy-of-a-fix-message
+        let fix_string = "8=FIX.4.2\x019=171\x0135=R\x0134=3257\x0149=COMP-PRICES\x0152=20180508-09:02:43.968\x0156=BANK-PRICES\x01131=Q-EURGBP-BUY-3357-636613669639680362\x01146=1\x0155=EUR/GBP\x0115=EUR\x0138=3357\x0140=C\x0154=1\x0164=20180508\x01167=FOR\x0110=150";
+
+        let result = FixMessage::from_fix_string(fix_string);
+
+        assert!(result.is_ok(), "Failed to parse FIX message: {:?}", result.err());
+
+        let message = result.unwrap();
+
+        // Verify standard header fields
+        assert_eq!(message.begin_string, "FIX.4.2");
+        assert_eq!(message.body_length, 171);
+        assert_eq!(message.msg_type, MsgType::Other("R".to_string())); // Quote Request
+        assert_eq!(message.msg_seq_num, 3257);
+        assert_eq!(message.sender_comp_id, "COMP-PRICES");
+        assert_eq!(message.sending_time, "20180508-09:02:43.968");
+        assert_eq!(message.target_comp_id, "BANK-PRICES");
+
+        // Verify message-specific fields
+        assert_eq!(message.symbol, Some("EUR/GBP".to_string()));
+        assert_eq!(message.side, Some(Side::Buy));
+        assert_eq!(message.order_qty, Some(3357.0));
+        assert_eq!(message.security_type, Some("FOR".to_string()));
+        assert_eq!(message.checksum, "150");
+
+        // Verify additional fields are captured
+        assert_eq!(message.get_field(131), Some(&"Q-EURGBP-BUY-3357-636613669639680362".to_string()));
+        assert_eq!(message.get_field(146), Some(&"1".to_string()));
+        assert_eq!(message.get_field(15), Some(&"EUR".to_string()));
+        assert_eq!(message.get_field(64), Some(&"20180508".to_string()));
+
+        // Verify the message is considered valid
+        assert!(message.is_valid());
+    }
+}
+
 mod error_handling_tests {
     use super::*;
 

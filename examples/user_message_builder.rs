@@ -101,17 +101,6 @@ fn main() {
         }
     }
 
-    println!("\n=== Builder Pattern Advantages ===");
-    println!("1. Type Safety: Compile-time checks for field types");
-    println!("2. Fluent API: Chain method calls for readability");
-    println!("3. Automatic Calculations: Body length and checksum computed");
-    println!("4. Field Validation: Proper FIX field ordering");
-    println!("5. Custom Fields: Easy support for non-standard tags");
-    println!("6. Round-trip Support: Build → Serialize → Parse");
-    println!("7. Idiomatic Rust: Uses standard FromStr and Display traits");
-
-    println!("\n=== Usage Patterns ===");
-    println!("// Idiomatic usage with FromStr");
     println!("let msg = FixMessage::builder(\"D\".parse().unwrap(), ...)  // NewOrderSingle");
     println!("  .cl_ord_id(\"ORDER123\".to_string())");
     println!("  .symbol(\"AAPL\".to_string())");

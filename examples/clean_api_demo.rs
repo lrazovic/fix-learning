@@ -139,21 +139,4 @@ fn main() {
         }
         Err(e) => println!("  Parse error: {}", e),
     }
-
-    println!("\n=== Benefits of Removing to_str() Methods ===");
-    println!("✅ More idiomatic Rust code");
-    println!("✅ Consistent with standard library patterns");
-    println!("✅ Automatic string conversion via Display trait");
-    println!("✅ Works seamlessly with format! macro");
-    println!("✅ Better integration with other Rust libraries");
-    println!("✅ Less API surface area to maintain");
-    println!("✅ Automatic to_string() method via Display");
-    println!("✅ Standard Result<T, E> error handling");
-
-    println!("\n=== API Evolution ===");
-    println!("Before: MsgType::NewOrderSingle.to_str()");
-    println!("After:  format!(\"{{}}\", MsgType::NewOrderSingle)");
-    println!("After:  MsgType::NewOrderSingle.to_string()");
-    println!("\nBefore: MsgType::from_str(\"D\")");
-    println!("After:  \"D\".parse::<MsgType>().unwrap()");
 }
