@@ -25,9 +25,9 @@ mod trading_workflow_tests {
 		new_order.symbol = Some("AAPL".to_string());
 		new_order.side = Some(Side::Buy);
 		new_order.order_qty = Some(1000.0);
-		new_order.ord_type = Some("2".to_string()); // Limit order
+		new_order.ord_type = Some("2".into()); // Limit order
 		new_order.price = Some(150.25);
-		new_order.time_in_force = Some("0".to_string()); // Day order
+		new_order.time_in_force = Some("0".into()); // Day order
 
 		assert!(new_order.is_valid());
 		assert_eq!(new_order.msg_type, MsgType::NewOrderSingle);
@@ -44,7 +44,7 @@ mod trading_workflow_tests {
 		exec_new.cl_ord_id = Some("CLIENT_ORD_001".to_string());
 		exec_new.order_id = Some("BROKER_ORD_12345".to_string());
 		exec_new.exec_id = Some("EXEC_001".to_string());
-		exec_new.exec_type = Some("0".to_string()); // New
+		exec_new.exec_type = Some("0".into()); // New
 		exec_new.ord_status = Some(OrdStatus::New);
 		exec_new.symbol = Some("AAPL".to_string());
 		exec_new.side = Some(Side::Buy);
@@ -68,7 +68,7 @@ mod trading_workflow_tests {
 		exec_partial.cl_ord_id = Some("CLIENT_ORD_001".to_string());
 		exec_partial.order_id = Some("BROKER_ORD_12345".to_string());
 		exec_partial.exec_id = Some("EXEC_002".to_string());
-		exec_partial.exec_type = Some("F".to_string()); // Trade
+		exec_partial.exec_type = Some("F".into()); // Trade
 		exec_partial.ord_status = Some(OrdStatus::PartiallyFilled);
 		exec_partial.symbol = Some("AAPL".to_string());
 		exec_partial.side = Some(Side::Buy);
@@ -95,7 +95,7 @@ mod trading_workflow_tests {
 		exec_filled.cl_ord_id = Some("CLIENT_ORD_001".to_string());
 		exec_filled.order_id = Some("BROKER_ORD_12345".to_string());
 		exec_filled.exec_id = Some("EXEC_003".to_string());
-		exec_filled.exec_type = Some("F".to_string()); // Trade
+		exec_filled.exec_type = Some("F".into()); // Trade
 		exec_filled.ord_status = Some(OrdStatus::Filled);
 		exec_filled.symbol = Some("AAPL".to_string());
 		exec_filled.side = Some(Side::Buy);
@@ -126,7 +126,7 @@ mod trading_workflow_tests {
 		original_order.symbol = Some("TSLA".to_string());
 		original_order.side = Some(Side::Sell);
 		original_order.order_qty = Some(2000.0);
-		original_order.ord_type = Some("2".to_string()); // Limit
+		original_order.ord_type = Some("2".into()); // Limit
 		original_order.price = Some(245.75);
 
 		// 2. Order acknowledged
@@ -141,7 +141,7 @@ mod trading_workflow_tests {
 		ack_report.cl_ord_id = Some("HF_ORDER_500".to_string());
 		ack_report.order_id = Some("ECN_12345".to_string());
 		ack_report.exec_id = Some("ACK_001".to_string());
-		ack_report.exec_type = Some("0".to_string()); // New
+		ack_report.exec_type = Some("0".into()); // New
 		ack_report.ord_status = Some(OrdStatus::New);
 		ack_report.leaves_qty = Some(2000.0);
 		ack_report.cum_qty = Some(0.0);
@@ -205,7 +205,7 @@ mod trading_workflow_tests {
 		replace_request.symbol = Some("NVDA".to_string());
 		replace_request.side = Some(Side::Buy);
 		replace_request.order_qty = Some(1500.0); // Increased from 1000
-		replace_request.ord_type = Some("2".to_string());
+		replace_request.ord_type = Some("2".into());
 		replace_request.price = Some(520.50); // Increased price
 		// Add original client order ID in additional fields
 		replace_request.set_field(41, original_cl_ord_id.to_string()); // OrigClOrdID

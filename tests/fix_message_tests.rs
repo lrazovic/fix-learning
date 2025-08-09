@@ -329,9 +329,9 @@ mod integration_tests {
 		new_order.symbol = Some("MSFT".to_string());
 		new_order.side = Some(Side::Buy);
 		new_order.order_qty = Some(100.0);
-		new_order.ord_type = Some("2".to_string()); // Limit order
+		new_order.ord_type = Some("2".into()); // Limit order
 		new_order.price = Some(100.50);
-		new_order.time_in_force = Some("0".to_string()); // Day
+		new_order.time_in_force = Some("0".into()); // Day
 
 		assert!(new_order.is_valid());
 		assert_eq!(new_order.msg_type, MsgType::NewOrderSingle);
@@ -355,7 +355,7 @@ mod integration_tests {
 		exec_report.cl_ord_id = Some("ORDER123".to_string());
 		exec_report.order_id = Some("BROKER123".to_string());
 		exec_report.exec_id = Some("EXEC456".to_string());
-		exec_report.exec_type = Some("0".to_string()); // New
+		exec_report.exec_type = Some("0".into()); // New
 		exec_report.ord_status = Some(OrdStatus::New);
 		exec_report.symbol = Some("MSFT".to_string());
 		exec_report.side = Some(Side::Buy);
@@ -382,7 +382,7 @@ mod integration_tests {
 		fill_report.cl_ord_id = Some("ORDER123".to_string());
 		fill_report.order_id = Some("BROKER123".to_string());
 		fill_report.exec_id = Some("EXEC789".to_string());
-		fill_report.exec_type = Some("F".to_string()); // Fill
+		fill_report.exec_type = Some("F".into()); // Fill
 		fill_report.ord_status = Some(OrdStatus::Filled);
 		fill_report.symbol = Some("MSFT".to_string());
 		fill_report.side = Some(Side::Buy);

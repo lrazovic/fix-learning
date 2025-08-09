@@ -86,7 +86,7 @@ mod builder_pattern_tests {
 		assert_eq!(message.cl_ord_id, Some("CLIENT_ORDER_1".to_string()));
 		assert_eq!(message.order_id, Some("BROKER_ORDER_1".to_string()));
 		assert_eq!(message.exec_id, Some("EXEC_001".to_string()));
-		assert_eq!(message.exec_type, Some("F".to_string()));
+		assert_eq!(message.exec_type, Some("F".into()));
 		assert_eq!(message.ord_status, Some(OrdStatus::Filled));
 		assert_eq!(message.symbol, Some("TSLA".to_string()));
 		assert_eq!(message.side, Some(Side::Sell));
@@ -308,7 +308,7 @@ mod parsing_tests {
 		assert_eq!(parsed.msg_type, MsgType::NewOrderSingle);
 		assert_eq!(parsed.cl_ord_id, Some("ORDER123".to_string()));
 		assert_eq!(parsed.order_qty, Some(100.0));
-		assert_eq!(parsed.ord_type, Some("2".to_string()));
+		assert_eq!(parsed.ord_type, Some("2".into()));
 		assert_eq!(parsed.side, Some(Side::Buy));
 		assert_eq!(parsed.symbol, Some("AAPL".to_string()));
 		assert_eq!(parsed.price, Some(150.25));

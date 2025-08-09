@@ -51,19 +51,19 @@ fix_enum!(Strict OrdStatus {
 	PendingReplace     => "E",
 });
 
-const SOH: &str = &"\x01"; // SOH character
+const SOH: &str = "\x01"; // SOH character
 
 // Main FIX 4.2 Message struct
 #[derive(Debug, Clone, PartialEq)]
 pub struct FixMessage {
 	// Standard Header Fields
-	pub begin_string: String,   // Tag 8 - Always "FIX.4.2"
-	pub body_length: u32,       // Tag 9 - Length of message body
-	pub msg_type: MsgType,      // Tag 35 - Message type
-	pub sender_comp_id: String, // Tag 49 - Sender's company ID
-	pub target_comp_id: String, // Tag 56 - Target's company ID
-	pub msg_seq_num: u32,       // Tag 34 - Message sequence number
-	pub sending_time: String,   // Tag 52 - Time of message transmission
+	pub begin_string: &'static str, // Tag 8 - Always "FIX.4.2"
+	pub body_length: u32,           // Tag 9 - Length of message body
+	pub msg_type: MsgType,          // Tag 35 - Message type
+	pub sender_comp_id: String,     // Tag 49 - Sender's company ID
+	pub target_comp_id: String,     // Tag 56 - Target's company ID
+	pub msg_seq_num: u32,           // Tag 34 - Message sequence number
+	pub sending_time: String,       // Tag 52 - Time of message transmission
 
 	// Optional Header Fields
 	pub poss_dup_flag: Option<bool>,       // Tag 43 - Possible duplicate flag
@@ -111,7 +111,7 @@ impl FixMessage {
 		sending_time: impl Into<String>,
 	) -> Self {
 		FixMessage {
-			begin_string: "FIX.4.2".to_string(),
+			begin_string: "FIX.4.2",
 			body_length: 0, // Will be calculated when serializing
 			msg_type,
 			sender_comp_id: sender_comp_id.into(),
@@ -500,7 +500,7 @@ impl FixMessage {
 		for field in fields {
 			if let Some((tag_str, value)) = field.split_once('=') {
 				match tag_str.parse::<u32>() {
-					Ok(8) => message.begin_string = value.into(),
+					Ok(8) => message.begin_string = "FIX.4.2",
 					Ok(9) => message.body_length = value.parse().unwrap_or(0),
 					Ok(35) => message.msg_type = MsgType::from_str(value).unwrap_or(MsgType::Other(value.into())),
 					Ok(34) => message.msg_seq_num = value.parse().unwrap_or(0),
