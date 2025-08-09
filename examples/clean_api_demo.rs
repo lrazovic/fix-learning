@@ -4,6 +4,7 @@
 //! makes the API more idiomatic and cleaner to use.
 
 use fix_learning::{FixMessage, MsgType, OrdStatus, Side};
+use time::OffsetDateTime;
 
 fn main() {
 	println!("=== Clean API Demo: No More .to_string() Methods! ===\n");
@@ -40,8 +41,8 @@ fn main() {
 		"TRADER",
 		"EXCHANGE",
 		1,
-		"20241201-09:30:00.000",
 	)
+	.sending_time(OffsetDateTime::now_utc())
 	.cl_ord_id("ORDER123")
 	.symbol("AAPL")
 	.side("1".parse().unwrap()) // Clean parsing
