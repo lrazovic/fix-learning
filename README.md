@@ -63,28 +63,28 @@ cargo test test_parse_real_fix_message
 ### Using the Builder Pattern with Idiomatic Rust (Recommended)
 
 ```rust
+use time::OffsetDateTime;
 use fix_learning::{FixMessage, MsgType, Side};
 
-// Create a New Order Single - clean API without forced .to_string() calls!
+// Create a New Order Single
 let new_order = FixMessage::builder(
     "D".parse().unwrap(),               // MsgType::NewOrderSingle using FromStr
     "TRADER",                           // Direct string literals work!
     "EXCHANGE",                         // No .to_string() needed
     100,
-    "20241201-09:30:00.000",           // Clean and simple
 )
+.sending_time(OffsetDateTime::now_utc())  // Uses time crate OffsetDateTime
 .cl_ord_id("ORDER_001")                // No .to_string() boilerplate
 .symbol("AAPL")                        // Much cleaner API
 .side("1".parse().unwrap())            // Side::Buy using FromStr
 .order_qty(100.0)
-.ord_type("2")                         // Direct string usage
 .price(150.25)
-.time_in_force("0")                    // No conversion needed
 .build();
 
 // Serialize to FIX wire format
 let fix_string = new_order.to_fix_string();
 println!("{}", fix_string);
+```
 // Output: 8=FIX.4.2^A9=120^A35=D^A34=100^A49=TRADER^A...
 
 // Clean enum conversions - uses standard Rust traits!
@@ -98,26 +98,27 @@ println!("Message: {}, Side: {}", msg_type, side); // Display trait works automa
 Based on your original FIX string, here's how to build it with the builder pattern:
 
 ```rust
+use time::macros::datetime;
+
 let user_message = FixMessage::builder(
     "D".parse().unwrap(),               // MsgType::NewOrderSingle using FromStr
     "TESTBUY3",
     "TESTSELL3",
     972,
-    "20190206-16:25:10.403",
+)
+.sending_time(                         // Precise timestamp control
+    datetime!(2019-02-06 16:25:10.403 UTC)
 )
 .cl_ord_id("14163685067084226997921")
 .order_qty(100.0)
 .ord_type("1")                         // Market order
 .side("1".parse().unwrap())            // Side::Buy using FromStr
-.symbol("AAPL")                        // Simple and clean
+.symbol("AAPL")
 .field(21, "2")                        // HandlInst
 .field(60, "20190206-16:25:08.968")    // TransactTime
 .field(207, "TO")                      // SecurityExchange
 .field(6000, "TEST1234")               // Custom field
 .build();
-
-let fix_string = user_message.to_fix_string();
-// Produces properly formatted FIX message with checksum
 ```
 
 ### Creating a Basic Message (Alternative Method)
@@ -130,8 +131,8 @@ let heartbeat = FixMessage::new(
     "CLIENT",
     "BROKER",
     1,
-    "20241201-12:00:00.000",
 );
+// sending_time is automatically set to OffsetDateTime::now_utc()
 ```
 
 ### Working with Custom Fields
@@ -152,11 +153,12 @@ if let Some(value) = message.get_field(9999) {
 
 ```rust
 // Build a message using clean API
-let message = FixMessage::builder("8".parse().unwrap(), "TRADER", "EXCHANGE", 1, "20241201-09:30:00.000") // ExecutionReport
+let message = FixMessage::builder("8".parse().unwrap(), "TRADER", "EXCHANGE", 1) // ExecutionReport
     .symbol("MSFT")                    // No .to_string() needed!
     .side("1".parse().unwrap())        // Buy
     .ord_status("2".parse().unwrap())  // Filled
     .build();
+// Uses current time automatically, or add .sending_time(custom_offset_datetime)
 
 // Serialize to FIX wire format (with SOH separators, uses Display trait)
 let fix_string = message.to_fix_string();
@@ -228,12 +230,14 @@ The integration tests demonstrate several real-world scenarios:
 
 ### Key Methods
 
-- **`FixMessage::builder(...)`**: Create a new builder (accepts string literals directly!)
-- **`FixMessage::to_fix_string()`**: Serialize to FIX wire format
-- **`FixMessage::from_fix_string()`**: Parse from FIX wire format
+- **`FixMessage::builder(...)`**: Create a new builder (uses current time by default!)
+- **`FixMessage::to_fix_string()`**: Serialize to FIX wire format with proper UTC timestamps
+- **`FixMessage::from_fix_string()`**: Parse from FIX wire format with leap second support
+- **`builder.sending_time(offset_datetime)`**: Set custom timestamp using time crate OffsetDateTime
 - **`builder.field(tag, value)`**: Set custom field
 - **`message.get_field(tag)`**: Retrieve custom field
 - **`"D".parse::<MsgType>()`**: Parse enum from string using `FromStr`
+- **`MsgType::NewOrderSingle.to_string()`**: Convert enum to string using `Display`
 - **`format!("{}", msg_type)`**: Format enum to string using `Display`
 - **`msg_type.to_string()`**: Automatic string conversion via `Display` trait
 

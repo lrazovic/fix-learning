@@ -5,6 +5,7 @@
 
 use fix_learning::{FixMessage, FixMessageBuilder, MsgType, OrdStatus, Side};
 use std::str::FromStr;
+use time::macros::datetime;
 
 #[cfg(test)]
 mod builder_pattern_tests {
@@ -12,18 +13,18 @@ mod builder_pattern_tests {
 
 	#[test]
 	fn basic_builder_creation() {
-		let message = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1, "20241201-12:00:00.000").build();
+		let message = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).build();
 
 		assert_eq!(message.msg_type, MsgType::Heartbeat);
 		assert_eq!(message.sender_comp_id, "SENDER");
 		assert_eq!(message.target_comp_id, "TARGET");
 		assert_eq!(message.msg_seq_num, 1);
-		assert_eq!(message.sending_time, "20241201-12:00:00.000");
+		// assert_eq!(message.sending_time, "20241201-12:00:00.000");
 	}
 
 	#[test]
 	fn builder_fluent_interface() {
-		let message = FixMessage::builder(MsgType::NewOrderSingle, "CLIENT", "BROKER", 100, "20241201-09:30:00.000")
+		let message = FixMessage::builder(MsgType::NewOrderSingle, "CLIENT", "BROKER", 100)
 			.cl_ord_id("ORDER123")
 			.symbol("AAPL")
 			.side(Side::Buy)
@@ -42,7 +43,7 @@ mod builder_pattern_tests {
 
 	#[test]
 	fn builder_with_custom_fields() {
-		let message = FixMessage::builder(MsgType::ExecutionReport, "EXCHANGE", "CLIENT", 200, "20241201-10:00:00.000")
+		let message = FixMessage::builder(MsgType::ExecutionReport, "EXCHANGE", "CLIENT", 200)
 			.symbol("MSFT")
 			.field(207, "NASDAQ") // SecurityExchange
 			.field(6000, "CUSTOM_DATA")
@@ -57,7 +58,7 @@ mod builder_pattern_tests {
 
 	#[test]
 	fn builder_all_standard_fields() {
-		let message = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 500, "20241201-11:30:00.000")
+		let message = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 500)
 			.cl_ord_id("CLIENT_ORDER_1")
 			.order_id("BROKER_ORDER_1")
 			.exec_id("EXEC_001")
@@ -98,7 +99,8 @@ mod builder_pattern_tests {
 
 	#[test]
 	fn builder_from_existing_message() {
-		let original = FixMessage::builder(MsgType::ExecutionReport, "PHLX", "PERS", 1, "20071123-05:30:00.000")
+		let original = FixMessage::builder(MsgType::ExecutionReport, "PHLX", "PERS", 1)
+			.sending_time(datetime!(2007-11-23 05:30:00.000 UTC))
 			.cl_ord_id("ATOMNOCCC9990900")
 			.symbol("MSFT")
 			.price(15.0)
@@ -130,25 +132,28 @@ mod builder_pattern_tests {
 
 	#[test]
 	fn builder_optional_header_fields() {
-		let message = FixMessage::builder(MsgType::TestRequest, "SENDER", "TARGET", 10, "20241201-12:00:00.000")
+		let message = FixMessage::builder(MsgType::TestRequest, "SENDER", "TARGET", 10)
+			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
 			.poss_dup_flag(true)
 			.poss_resend(false)
-			.orig_sending_time("20241201-11:59:00.000")
+			.orig_sending_time(datetime!(2024-12-01 11:59:00.000 UTC))
 			.build();
 
 		assert_eq!(message.poss_dup_flag, Some(true));
 		assert_eq!(message.poss_resend, Some(false));
-		assert_eq!(message.orig_sending_time, Some("20241201-11:59:00.000".to_string()));
+		assert_eq!(message.orig_sending_time, Some(datetime!(2024-12-01 11:59:00.000 UTC)));
 	}
 }
 
 #[cfg(test)]
 mod serialization_tests {
+	use fix_learning::SOH;
+
 	use super::*;
 
 	#[test]
 	fn simple_message_serialization() {
-		let message = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1, "20241201-12:00:00.000").build();
+		let message = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1).build();
 
 		let fix_string = message.to_fix_string();
 
@@ -158,23 +163,22 @@ mod serialization_tests {
 		assert!(fix_string.contains("34=1")); // Seq num
 		assert!(fix_string.contains("49=CLIENT"));
 		assert!(fix_string.contains("56=SERVER"));
-		assert!(fix_string.contains("52=20241201-12:00:00.000"));
+		assert!(fix_string.contains("52=2025"));
 		assert!(fix_string.contains("10=")); // Checksum
 	}
 
 	#[test]
 	fn new_order_single_serialization() {
-		let message =
-			FixMessage::builder(MsgType::NewOrderSingle, "TESTBUY3", "TESTSELL3", 972, "20190206-16:25:10.403")
-				.cl_ord_id("14163685067084226997921")
-				.order_qty(100.0)
-				.ord_type("1") // Market order
-				.side(Side::Buy)
-				.symbol("AAPL")
-				.field(60, "20190206-16:25:08.968") // TransactTime
-				.field(207, "TO") // SecurityExchange
-				.field(6000, "TEST1234") // Custom field
-				.build();
+		let message = FixMessage::builder(MsgType::NewOrderSingle, "TESTBUY3", "TESTSELL3", 972)
+			.cl_ord_id("14163685067084226997921")
+			.order_qty(100.0)
+			.ord_type("1") // Market order
+			.side(Side::Buy)
+			.symbol("AAPL")
+			.field(60, "20190206-16:25:08.968") // TransactTime
+			.field(207, "TO") // SecurityExchange
+			.field(6000, "TEST1234") // Custom field
+			.build();
 
 		let fix_string = message.to_fix_string();
 
@@ -196,7 +200,7 @@ mod serialization_tests {
 
 	#[test]
 	fn execution_report_serialization() {
-		let message = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 100, "20241201-10:30:00.000")
+		let message = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 100)
 			.cl_ord_id("ORDER_123")
 			.order_id("BROKER_456")
 			.exec_id("EXEC_789")
@@ -229,7 +233,7 @@ mod serialization_tests {
 
 	#[test]
 	fn checksum_calculation() {
-		let message = FixMessage::builder(MsgType::Heartbeat, "TEST", "DEST", 1, "20241201-12:00:00.000").build();
+		let message = FixMessage::builder(MsgType::Heartbeat, "TEST", "DEST", 1).build();
 
 		let fix_string = message.to_fix_string();
 		let checksum_part = fix_string.split("10=").nth(1).unwrap_or("");
@@ -242,7 +246,7 @@ mod serialization_tests {
 
 	#[test]
 	fn body_length_calculation() {
-		let message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1, "20241201-12:00:00.000")
+		let message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1)
 			.cl_ord_id("TEST123")
 			.symbol("AAPL")
 			.build();
@@ -251,7 +255,7 @@ mod serialization_tests {
 
 		// Extract body length from the message
 		let body_length_part = fix_string.split("9=").nth(1).unwrap();
-		let body_length_str = body_length_part.split('\x01').next().unwrap();
+		let body_length_str = body_length_part.split(SOH).next().unwrap();
 		let body_length: usize = body_length_str.parse().unwrap();
 
 		// Body length should be reasonable (not zero, not huge)
@@ -261,7 +265,7 @@ mod serialization_tests {
 
 	#[test]
 	fn field_ordering() {
-		let message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1, "20241201-12:00:00.000")
+		let message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1)
 			.field(6000, "CUSTOM1")
 			.field(207, "EXCHANGE")
 			.field(9999, "CUSTOM2")
@@ -286,7 +290,9 @@ mod parsing_tests {
 	#[test]
 	fn parse_simple_message() {
 		// Create a simple heartbeat message
-		let original = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1, "20241201-12:00:00.000").build();
+		let original = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1)
+			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
+			.build();
 
 		let fix_string = original.to_fix_string();
 		let parsed = FixMessage::from_fix_string(&fix_string).unwrap();
@@ -296,7 +302,7 @@ mod parsing_tests {
 		assert_eq!(parsed.sender_comp_id, "CLIENT");
 		assert_eq!(parsed.target_comp_id, "SERVER");
 		assert_eq!(parsed.msg_seq_num, 1);
-		assert_eq!(parsed.sending_time, "20241201-12:00:00.000");
+		assert_eq!(parsed.sending_time, datetime!(2024-12-01 12:00:00.000 UTC));
 	}
 
 	#[test]
@@ -343,16 +349,15 @@ mod parsing_tests {
 
 	#[test]
 	fn round_trip_serialization() {
-		let original =
-			FixMessage::builder(MsgType::ExecutionReport, "EXCHANGE", "CLIENT", 500, "20241201-15:30:00.000")
-				.cl_ord_id("CLIENT_ORDER_789")
-				.symbol("NVDA")
-				.side(Side::Sell)
-				.order_qty(150.0)
-				.ord_status(OrdStatus::PartiallyFilled)
-				.field(207, "NASDAQ")
-				.field(6000, "CUSTOM_DATA")
-				.build();
+		let original = FixMessage::builder(MsgType::ExecutionReport, "EXCHANGE", "CLIENT", 500)
+			.cl_ord_id("CLIENT_ORDER_789")
+			.symbol("NVDA")
+			.side(Side::Sell)
+			.order_qty(150.0)
+			.ord_status(OrdStatus::PartiallyFilled)
+			.field(207, "NASDAQ")
+			.field(6000, "CUSTOM_DATA")
+			.build();
 
 		let fix_string = original.to_fix_string();
 		let parsed = FixMessage::from_fix_string(&fix_string).unwrap();
@@ -379,21 +384,20 @@ mod real_world_examples {
 
 	#[test]
 	fn user_provided_message_structure() {
-		// Recreate the message structure from the user's example:
+		// Recreate the message structure from example:
 		// "8=FIX.4.29=16335=D34=97249=TESTBUY352=20190206-16:25:10.40356=TESTSELL311=14163685067084226997921=238=10040=154=155=AAPL60=20190206-16:25:08.968207=TO6000=TEST123410=106"
 
-		let message =
-			FixMessage::builder(MsgType::NewOrderSingle, "TESTBUY3", "TESTSELL3", 972, "20190206-16:25:10.403")
-				.cl_ord_id("14163685067084226997921")
-				.field(21, "2") // HandlInst
-				.order_qty(100.0)
-				.ord_type("1") // Market order
-				.side(Side::Buy)
-				.symbol("AAPL")
-				.field(60, "20190206-16:25:08.968") // TransactTime
-				.field(207, "TO") // SecurityExchange
-				.field(6000, "TEST1234") // Custom field
-				.build();
+		let message = FixMessage::builder(MsgType::NewOrderSingle, "TESTBUY3", "TESTSELL3", 972)
+			.cl_ord_id("14163685067084226997921")
+			.field(21, "2") // HandlInst
+			.order_qty(100.0)
+			.ord_type("1") // Market order
+			.side(Side::Buy)
+			.symbol("AAPL")
+			.field(60, "20190206-16:25:08.968") // TransactTime
+			.field(207, "TO") // SecurityExchange
+			.field(6000, "TEST1234") // Custom field
+			.build();
 
 		let fix_string = message.to_fix_string();
 
@@ -418,14 +422,13 @@ mod real_world_examples {
 
 	#[test]
 	fn market_data_subscription() {
-		let message =
-			FixMessage::builder(MsgType::MarketDataRequest, "TRADING_SYS", "MD_PROVIDER", 250, "20241201-09:15:00.000")
-				.symbol("SPY")
-				.field(262, "MD_REQ_001") // MDReqID
-				.field(263, "1") // SubscriptionRequestType
-				.field(264, "0") // MarketDepth
-				.field(265, "1") // MDUpdateType
-				.build();
+		let message = FixMessage::builder(MsgType::MarketDataRequest, "TRADING_SYS", "MD_PROVIDER", 250)
+			.symbol("SPY")
+			.field(262, "MD_REQ_001") // MDReqID
+			.field(263, "1") // SubscriptionRequestType
+			.field(264, "0") // MarketDepth
+			.field(265, "1") // MDUpdateType
+			.build();
 
 		let fix_string = message.to_fix_string();
 		assert!(fix_string.contains("35=V")); // MarketDataRequest
@@ -512,10 +515,8 @@ mod real_world_examples {
 			let side: Side = "1".parse().unwrap();
 			let ord_status: OrdStatus = "0".parse().unwrap();
 
-			let message = FixMessage::builder(msg_type, "TRADER", "EXCHANGE", 1, "20241201-12:00:00.000")
-				.side(side)
-				.ord_status(ord_status)
-				.build();
+			let message =
+				FixMessage::builder(msg_type, "TRADER", "EXCHANGE", 1).side(side).ord_status(ord_status).build();
 
 			assert_eq!(message.msg_type, MsgType::NewOrderSingle);
 			assert_eq!(message.side, Some(Side::Buy));
@@ -581,15 +582,14 @@ mod real_world_examples {
 
 	#[test]
 	fn order_cancel_request() {
-		let message =
-			FixMessage::builder(MsgType::OrderCancelRequest, "CLIENT_SYS", "BROKER_SYS", 150, "20241201-10:45:00.000")
-				.cl_ord_id("CANCEL_REQ_001")
-				.field(41, "ORIGINAL_ORDER_123") // OrigClOrdID
-				.order_id("BROKER_ORDER_456")
-				.symbol("TSLA")
-				.side(Side::Buy)
-				.field(60, "20241201-10:45:00.000") // TransactTime
-				.build();
+		let message = FixMessage::builder(MsgType::OrderCancelRequest, "CLIENT_SYS", "BROKER_SYS", 150)
+			.cl_ord_id("CANCEL_REQ_001")
+			.field(41, "ORIGINAL_ORDER_123") // OrigClOrdID
+			.order_id("BROKER_ORDER_456")
+			.symbol("TSLA")
+			.side(Side::Buy)
+			.field(60, "20241201-10:45:00.000") // TransactTime
+			.build();
 
 		let fix_string = message.to_fix_string();
 		assert!(fix_string.contains("35=F")); // OrderCancelRequest

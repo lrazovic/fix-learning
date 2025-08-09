@@ -149,20 +149,13 @@ mod fix_message_tests {
 
 	#[test]
 	fn new_fix_message_creation() {
-		let msg = FixMessage::new(
-			MsgType::Heartbeat,
-			"SENDER".to_string(),
-			"TARGET".to_string(),
-			123,
-			"20241201-12:00:00.000".to_string(),
-		);
+		let msg = FixMessage::new(MsgType::Heartbeat, "SENDER".to_string(), "TARGET".to_string(), 123);
 
 		assert_eq!(msg.begin_string, "FIX.4.2");
 		assert_eq!(msg.msg_type, MsgType::Heartbeat);
 		assert_eq!(msg.sender_comp_id, "SENDER");
 		assert_eq!(msg.target_comp_id, "TARGET");
 		assert_eq!(msg.msg_seq_num, 123);
-		assert_eq!(msg.sending_time, "20241201-12:00:00.000");
 		assert_eq!(msg.body_length, 0);
 		assert_eq!(msg.checksum, "000");
 	}
@@ -176,18 +169,12 @@ mod fix_message_tests {
 		assert_eq!(msg.sender_comp_id, "SENDER");
 		assert_eq!(msg.target_comp_id, "TARGET");
 		assert_eq!(msg.msg_seq_num, 1);
-		assert_eq!(msg.sending_time, "19700101-00:00:00.000");
+		// assert_eq!(msg.sending_time, "19700101-00:00:00.000");
 	}
 
 	#[test]
 	fn fix_message_optional_fields() {
-		let mut msg = FixMessage::new(
-			MsgType::NewOrderSingle,
-			"CLIENT".to_string(),
-			"BROKER".to_string(),
-			1,
-			"20241201-12:00:00.000".to_string(),
-		);
+		let mut msg = FixMessage::new(MsgType::NewOrderSingle, "CLIENT", "BROKER", 1);
 
 		// Initially, optional fields should be None
 		assert_eq!(msg.cl_ord_id, None);
@@ -227,70 +214,39 @@ mod fix_message_tests {
 	#[test]
 	fn is_valid() {
 		// Valid message
-		let valid_msg = FixMessage::new(
-			MsgType::Heartbeat,
-			"SENDER".to_string(),
-			"TARGET".to_string(),
-			1,
-			"20241201-12:00:00.000".to_string(),
-		);
+		let valid_msg = FixMessage::new(MsgType::Heartbeat, "SENDER", "TARGET", 1);
 		assert!(valid_msg.is_valid());
 
 		// Invalid message - empty sender
 		let invalid_msg = FixMessage::new(
 			MsgType::Heartbeat,
-			"".to_string(), // Empty sender
-			"TARGET".to_string(),
+			"", // Empty sender
+			"TARGET",
 			1,
-			"20241201-12:00:00.000".to_string(),
 		);
 		assert!(!invalid_msg.is_valid());
 
 		// Invalid message - empty target
 		let invalid_msg2 = FixMessage::new(
 			MsgType::Heartbeat,
-			"SENDER".to_string(),
-			"".to_string(), // Empty target
+			"SENDER",
+			"", // Empty target
 			1,
-			"20241201-12:00:00.000".to_string(),
 		);
 		assert!(!invalid_msg2.is_valid());
-
-		// Invalid message - empty sending time
-		let invalid_msg3 = FixMessage::new(
-			MsgType::Heartbeat,
-			"SENDER".to_string(),
-			"TARGET".to_string(),
-			1,
-			"".to_string(), // Empty sending time
-		);
-		assert!(!invalid_msg3.is_valid());
 	}
 
 	#[test]
 	fn message_equality() {
-		let msg1 = FixMessage::new(
-			MsgType::Heartbeat,
-			"SENDER".to_string(),
-			"TARGET".to_string(),
-			1,
-			"20241201-12:00:00.000".to_string(),
-		);
-
-		let msg2 = FixMessage::new(
-			MsgType::Heartbeat,
-			"SENDER".to_string(),
-			"TARGET".to_string(),
-			1,
-			"20241201-12:00:00.000".to_string(),
-		);
+		let now = time::OffsetDateTime::now_utc();
+		let msg1 = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).sending_time(now).build();
+		let msg2 = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).sending_time(now).build();
 
 		let msg3 = FixMessage::new(
 			MsgType::TestRequest, // Different message type
-			"SENDER".to_string(),
-			"TARGET".to_string(),
+			"SENDER",
+			"TARGET",
 			1,
-			"20241201-12:00:00.000".to_string(),
 		);
 
 		assert_eq!(msg1, msg2);
@@ -316,13 +272,7 @@ mod integration_tests {
 	#[test]
 	fn new_order_single_workflow() {
 		// Create a New Order Single message
-		let mut new_order = FixMessage::new(
-			MsgType::NewOrderSingle,
-			"CLIENT".to_string(),
-			"BROKER".to_string(),
-			1,
-			"20241201-12:00:00.000".to_string(),
-		);
+		let mut new_order = FixMessage::new(MsgType::NewOrderSingle, "CLIENT", "BROKER", 1);
 
 		// Set order fields
 		new_order.cl_ord_id = Some("ORDER123".to_string());
@@ -343,13 +293,7 @@ mod integration_tests {
 	#[test]
 	fn execution_report_workflow() {
 		// Create an Execution Report in response to the order
-		let mut exec_report = FixMessage::new(
-			MsgType::ExecutionReport,
-			"BROKER".to_string(),
-			"CLIENT".to_string(),
-			1,
-			"20241201-12:00:01.000".to_string(),
-		);
+		let mut exec_report = FixMessage::new(MsgType::ExecutionReport, "BROKER", "CLIENT", 1);
 
 		// Set execution fields
 		exec_report.cl_ord_id = Some("ORDER123".to_string());
@@ -371,13 +315,7 @@ mod integration_tests {
 	#[test]
 	fn fill_execution_report() {
 		// Create a fill execution report
-		let mut fill_report = FixMessage::new(
-			MsgType::ExecutionReport,
-			"BROKER".to_string(),
-			"CLIENT".to_string(),
-			2,
-			"20241201-12:00:02.000".to_string(),
-		);
+		let mut fill_report = FixMessage::new(MsgType::ExecutionReport, "BROKER", "CLIENT", 2);
 
 		fill_report.cl_ord_id = Some("ORDER123".to_string());
 		fill_report.order_id = Some("BROKER123".to_string());
@@ -401,13 +339,7 @@ mod integration_tests {
 
 	#[test]
 	fn heartbeat_message() {
-		let heartbeat = FixMessage::new(
-			MsgType::Heartbeat,
-			"CLIENT".to_string(),
-			"BROKER".to_string(),
-			10,
-			"20241201-12:05:00.000".to_string(),
-		);
+		let heartbeat = FixMessage::new(MsgType::Heartbeat, "CLIENT", "BROKER", 10);
 
 		assert!(heartbeat.is_valid());
 		assert_eq!(heartbeat.msg_type, MsgType::Heartbeat);

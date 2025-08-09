@@ -6,6 +6,10 @@
 pub mod macros;
 
 use std::{borrow::Cow, collections::BTreeMap, str::FromStr};
+use time::{
+	Duration, OffsetDateTime, PrimitiveDateTime, UtcOffset, format_description::BorrowedFormatItem,
+	macros::format_description,
+};
 
 // FIX 4.2 Message Types
 fix_enum!(Loose MsgType {
@@ -52,24 +56,29 @@ fix_enum!(Strict OrdStatus {
 });
 
 /// The Start of Heading control character, value 0x01, is used for field termination.
-const SOH: &str = "\x01";
+pub const SOH: &str = "\x01";
+
+/// Time/date combination represented in UTC (Universal Time Coordinated, also known as "GMT")
+/// in either YYYYMMDD-HH:MM:SS (whole seconds) or YYYYMMDD-HH:MM:SS.sss (milliseconds) format, colons, dash, and period required.
+static FORMAT_TIME: &[BorrowedFormatItem<'_>] =
+	format_description!("[year][month][day]-[hour]:[minute]:[second].[subsecond digits:3]");
 
 // Main FIX 4.2 Message struct
 #[derive(Debug, Clone, PartialEq)]
 pub struct FixMessage {
 	// Standard Header Fields
-	pub begin_string: &'static str, // Tag 8 - Always "FIX.4.2"
-	pub body_length: u32,           // Tag 9 - Length of message body
-	pub msg_type: MsgType,          // Tag 35 - Message type
-	pub sender_comp_id: String,     // Tag 49 - Sender's company ID
-	pub target_comp_id: String,     // Tag 56 - Target's company ID
-	pub msg_seq_num: u32,           // Tag 34 - Message sequence number
-	pub sending_time: String,       // Tag 52 - Time of message transmission
+	pub begin_string: &'static str,   // Tag 8 - Always "FIX.4.2"
+	pub body_length: u32,             // Tag 9 - Length of message body
+	pub msg_type: MsgType,            // Tag 35 - Message type
+	pub sender_comp_id: String,       // Tag 49 - Sender's company ID
+	pub target_comp_id: String,       // Tag 56 - Target's company ID
+	pub msg_seq_num: u32,             // Tag 34 - Message sequence number
+	pub sending_time: OffsetDateTime, // Tag 52 - Time of message transmission
 
 	// Optional Header Fields
-	pub poss_dup_flag: Option<bool>,       // Tag 43 - Possible duplicate flag
-	pub poss_resend: Option<bool>,         // Tag 97 - Possible resend flag
-	pub orig_sending_time: Option<String>, // Tag 122 - Original sending time
+	pub poss_dup_flag: Option<bool>,               // Tag 43 - Possible duplicate flag
+	pub poss_resend: Option<bool>,                 // Tag 97 - Possible resend flag
+	pub orig_sending_time: Option<OffsetDateTime>, // Tag 122 - Original sending time
 
 	// Common Body Fields (varies by message type)
 	pub cl_ord_id: Option<String>,       // Tag 11 - Client order ID
@@ -109,16 +118,15 @@ impl FixMessage {
 		sender_comp_id: impl Into<String>,
 		target_comp_id: impl Into<String>,
 		msg_seq_num: u32,
-		sending_time: impl Into<String>,
 	) -> Self {
-		FixMessage {
+		Self {
 			begin_string: "FIX.4.2",
-			body_length: 0, // Will be calculated when serializing
+			body_length: Default::default(), // Will be calculated when serializing
 			msg_type,
 			sender_comp_id: sender_comp_id.into(),
 			target_comp_id: target_comp_id.into(),
 			msg_seq_num,
-			sending_time: sending_time.into(),
+			sending_time: OffsetDateTime::now_utc(),
 			poss_dup_flag: None,
 			poss_resend: None,
 			orig_sending_time: None,
@@ -160,17 +168,15 @@ impl FixMessage {
 	}
 
 	// Check if message is valid (basic validation)
-	pub fn is_valid(&self) -> bool {
-		!self.begin_string.is_empty() &&
-			!self.sender_comp_id.is_empty() &&
-			!self.target_comp_id.is_empty() &&
-			!self.sending_time.is_empty()
+	/// Basic message validation
+	pub const fn is_valid(&self) -> bool {
+		!self.sender_comp_id.is_empty() && !self.target_comp_id.is_empty()
 	}
 }
 
 impl Default for FixMessage {
 	fn default() -> Self {
-		FixMessage::new(MsgType::Heartbeat, "SENDER", "TARGET", 1, "19700101-00:00:00.000")
+		Self::new(MsgType::Heartbeat, "SENDER", "TARGET", 1)
 	}
 }
 
@@ -187,9 +193,8 @@ impl FixMessageBuilder {
 		sender_comp_id: impl Into<String>,
 		target_comp_id: impl Into<String>,
 		msg_seq_num: u32,
-		sending_time: impl Into<String>,
 	) -> Self {
-		Self { message: FixMessage::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num, sending_time) }
+		Self { message: FixMessage::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num) }
 	}
 
 	/// Create a builder from an existing message
@@ -213,8 +218,13 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn orig_sending_time(mut self, time: impl Into<String>) -> Self {
-		self.message.orig_sending_time = Some(time.into());
+	pub const fn orig_sending_time(mut self, time: OffsetDateTime) -> Self {
+		self.message.orig_sending_time = Some(time);
+		self
+	}
+
+	pub const fn sending_time(mut self, time: OffsetDateTime) -> Self {
+		self.message.sending_time = time;
 		self
 	}
 
@@ -354,20 +364,19 @@ impl FixMessage {
 		sender_comp_id: impl Into<String>,
 		target_comp_id: impl Into<String>,
 		msg_seq_num: u32,
-		sending_time: impl Into<String>,
 	) -> FixMessageBuilder {
-		FixMessageBuilder::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num, sending_time)
+		FixMessageBuilder::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num)
 	}
 
 	/// Serialize the message to FIX wire format
 	pub fn to_fix_string(&self) -> String {
-		let mut fields = Vec::new();
+		let mut fields = Vec::with_capacity(256);
 
 		// Standard Header Fields (in order)
 		fields.push(format!("8={}", self.begin_string));
 
 		// We'll calculate body length after building the body
-		let mut body_fields = Vec::new();
+		let mut body_fields = Vec::with_capacity(256);
 
 		// Message type
 		body_fields.push(format!("35={}", self.msg_type));
@@ -377,7 +386,9 @@ impl FixMessage {
 
 		// Sender and target
 		body_fields.push(format!("49={}", self.sender_comp_id));
-		body_fields.push(format!("52={}", self.sending_time));
+		// Format timestamp according to FIX spec: YYYYMMDD-HH:MM:SS.sss
+		// Use millisecond precision for maximum compatibility
+		body_fields.push(format!("52={}", self.sending_time.format(FORMAT_TIME).unwrap()));
 		body_fields.push(format!("56={}", self.target_comp_id));
 
 		// Optional header fields
@@ -388,7 +399,8 @@ impl FixMessage {
 			body_fields.push(format!("97={}", if flag { "Y" } else { "N" }));
 		}
 		if let Some(ref time) = self.orig_sending_time {
-			body_fields.push(format!("122={}", time));
+			// Format original sending time with same precision as sending time
+			body_fields.push(format!("122={}", time.format(FORMAT_TIME).unwrap()));
 		}
 
 		// Body fields (in tag order for consistency)
@@ -467,7 +479,8 @@ impl FixMessage {
 
 		// Calculate body length
 		let body_string = body_fields.join(SOH);
-		let body_length = body_string.len();
+		// Per FIX spec, BodyLength (tag 9) counts bytes from after the SOH following tag 9 up to and including the SOH before tag 10
+		let body_length = body_string.len() + 1;
 		fields.push(format!("9={}", body_length));
 
 		// Add body fields
@@ -479,7 +492,7 @@ impl FixMessage {
 		fields.push(format!("10={:03}", calculated_checksum));
 
 		// Join all fields with SOH
-		fields.join(SOH)
+		fields.join(SOH) + SOH
 	}
 
 	/// Calculate FIX checksum
@@ -495,18 +508,22 @@ impl FixMessage {
 			return Err("Empty FIX message".to_string());
 		}
 
-		let mut message = FixMessage::default();
+		let mut message = Self::default();
 
 		for field in fields {
 			if let Some((tag_str, value)) = field.split_once('=') {
 				match tag_str.parse::<u32>() {
 					Ok(8) => message.begin_string = "FIX.4.2",
 					Ok(9) => message.body_length = value.parse().unwrap(),
-					Ok(35) => message.msg_type = MsgType::from_str(value).unwrap_or(MsgType::Other(value.into())),
+					Ok(35) =>
+						message.msg_type = MsgType::from_str(value).unwrap_or_else(|_| MsgType::Other(value.into())),
 					Ok(34) => message.msg_seq_num = value.parse().unwrap(),
 					Ok(49) => message.sender_comp_id = value.into(),
-					Ok(52) => message.sending_time = value.into(),
+					Ok(52) => message.sending_time = Self::parse_fix_timestamp(value)?,
 					Ok(56) => message.target_comp_id = value.into(),
+					Ok(43) => message.poss_dup_flag = Some(value == "Y"),
+					Ok(97) => message.poss_resend = Some(value == "Y"),
+					Ok(122) => message.orig_sending_time = Some(Self::parse_fix_timestamp(value)?),
 					Ok(11) => message.cl_ord_id = Some(value.into()),
 					Ok(37) => message.order_id = Some(value.into()),
 					Ok(17) => message.exec_id = Some(value.into()),
@@ -539,5 +556,25 @@ impl FixMessage {
 		}
 
 		Ok(message)
+	}
+
+	/// Parse FIX timestamp according to spec: YYYYMMDD-HH:MM:SS
+	/// Handles leap seconds by accepting second values up to 60 as per FIX specification
+	fn parse_fix_timestamp(s: &str) -> Result<OffsetDateTime, String> {
+		// Leap second handling
+		let (s, leap) = if s.contains(":60") { (s.replace(":60", ":59"), true) } else { (s.to_string(), false) };
+
+		let fmt_millis = FORMAT_TIME;
+		let fmt_seconds = format_description!("[year][month][day]-[hour]:[minute]:[second]");
+
+		let parsed = PrimitiveDateTime::parse(&s, &fmt_millis)
+			.or_else(|_| PrimitiveDateTime::parse(&s, &fmt_seconds))
+			.map_err(|e| format!("Invalid timestamp '{}': {}", s, e))?;
+
+		let mut dt = parsed.assume_offset(UtcOffset::UTC);
+		if leap {
+			dt += Duration::seconds(1);
+		}
+		Ok(dt)
 	}
 }

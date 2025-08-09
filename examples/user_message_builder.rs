@@ -4,6 +4,7 @@
 //! 8=FIX.4.2|9=163|35=D|34=972|49=TESTBUY3|52=20190206-16:25:10.403|56=TESTSELL3|11=14163685067084226997921|21=2|38=100|40=1|54=1|55=AAPL|60=20190206-16:25:08.968|207=TO|6000=TEST1234|10=106
 
 use fix_learning::FixMessage;
+use time::macros::datetime;
 
 fn main() {
 	println!("=== Building User's Exact FIX Message ===\n");
@@ -16,12 +17,12 @@ fn main() {
 
 	// Build the exact same message using the builder pattern with FromStr
 	let user_message = FixMessage::builder(
-		"D".parse().unwrap(),    // 35=D (NewOrderSingle) - using FromStr
-		"TESTBUY3",              // 49=TESTBUY3 (SenderCompID)
-		"TESTSELL3",             // 56=TESTSELL3 (TargetCompID)
-		972,                     // 34=972 (MsgSeqNum)
-		"20190206-16:25:10.403", // 52=20190206-16:25:10.403 (SendingTime)
+		"D".parse().unwrap(), // 35=D (NewOrderSingle) - using FromStr
+		"TESTBUY3",           // 49=TESTBUY3 (SenderCompID)
+		"TESTSELL3",          // 56=TESTSELL3 (TargetCompID)
+		972,                  // 34=972 (MsgSeqNum)
 	)
+	.sending_time(datetime!(2019-02-06 16:25:10.403 UTC)) // 52=20190206-16:25:10.403 (SendingTime)
 	// Standard FIX fields
 	.cl_ord_id("14163685067084226997921") // 11=14163685067084226997921 (ClOrdID)
 	.order_qty(100.0) // 38=100 (OrderQty)
