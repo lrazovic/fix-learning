@@ -84,7 +84,7 @@ let new_order = FixMessage::builder(
 // Serialize to FIX wire format
 let fix_string = new_order.to_fix_string();
 println!("{}", fix_string);
-```
+
 // Output: 8=FIX.4.2^A9=120^A35=D^A34=100^A49=TRADER^A...
 
 // Clean enum conversions - uses standard Rust traits!
