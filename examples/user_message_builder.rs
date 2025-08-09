@@ -16,23 +16,23 @@ fn main() {
 
 	// Build the exact same message using the builder pattern with FromStr
 	let user_message = FixMessage::builder(
-		"D".parse().unwrap(),                // 35=D (NewOrderSingle) - using FromStr
-		"TESTBUY3".to_string(),              // 49=TESTBUY3 (SenderCompID)
-		"TESTSELL3".to_string(),             // 56=TESTSELL3 (TargetCompID)
-		972,                                 // 34=972 (MsgSeqNum)
-		"20190206-16:25:10.403".to_string(), // 52=20190206-16:25:10.403 (SendingTime)
+		"D".parse().unwrap(),    // 35=D (NewOrderSingle) - using FromStr
+		"TESTBUY3",              // 49=TESTBUY3 (SenderCompID)
+		"TESTSELL3",             // 56=TESTSELL3 (TargetCompID)
+		972,                     // 34=972 (MsgSeqNum)
+		"20190206-16:25:10.403", // 52=20190206-16:25:10.403 (SendingTime)
 	)
 	// Standard FIX fields
-	.cl_ord_id("14163685067084226997921".to_string()) // 11=14163685067084226997921 (ClOrdID)
+	.cl_ord_id("14163685067084226997921") // 11=14163685067084226997921 (ClOrdID)
 	.order_qty(100.0) // 38=100 (OrderQty)
-	.ord_type("1".to_string()) // 40=1 (OrdType - Market order)
+	.ord_type("1") // 40=1 (OrdType - Market order)
 	.side("1".parse().unwrap()) // 54=1 (Side - Buy) - using FromStr
-	.symbol("AAPL".to_string()) // 55=AAPL (Symbol)
+	.symbol("AAPL") // 55=AAPL (Symbol)
 	// Custom fields using the field() method
-	.field(21, "2".to_string()) // 21=2 (HandlInst)
-	.field(60, "20190206-16:25:08.968".to_string()) // 60=20190206-16:25:08.968 (TransactTime)
-	.field(207, "TO".to_string()) // 207=TO (SecurityExchange)
-	.field(6000, "TEST1234".to_string()) // 6000=TEST1234 (Custom field)
+	.field(21, "2") // 21=2 (HandlInst)
+	.field(60, "20190206-16:25:08.968") // 60=20190206-16:25:08.968 (TransactTime)
+	.field(207, "TO") // 207=TO (SecurityExchange)
+	.field(6000, "TEST1234") // 6000=TEST1234 (Custom field)
 	.build();
 
 	// Serialize to FIX wire format
@@ -96,8 +96,8 @@ fn main() {
 	}
 
 	println!("let msg = FixMessage::builder(\"D\".parse().unwrap(), ...)  // NewOrderSingle");
-	println!("  .cl_ord_id(\"ORDER123\".to_string())");
-	println!("  .symbol(\"AAPL\".to_string())");
+	println!("  .cl_ord_id(\"ORDER123\")");
+	println!("  .symbol(\"AAPL\")");
 	println!("  .side(\"1\".parse().unwrap())  // Buy");
 	println!("  .build();");
 	println!();
@@ -108,8 +108,8 @@ fn main() {
 	println!();
 	println!("// With custom fields");
 	println!("let msg = FixMessage::builder(...)");
-	println!("  .field(207, \"NASDAQ\".to_string())  // SecurityExchange");
-	println!("  .field(6000, \"CUSTOM\".to_string())  // Custom tag");
+	println!("  .field(207, \"NASDAQ\")  // SecurityExchange");
+	println!("  .field(6000, \"CUSTOM\")  // Custom tag");
 	println!("  .build();");
 	println!();
 	println!("// Clean enum conversions");

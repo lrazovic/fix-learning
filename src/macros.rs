@@ -49,7 +49,7 @@ macro_rules! fix_enum {
             $($variant,)*
         }
 
-        impl std::str::FromStr for $name {
+        impl core::str::FromStr for $name {
             type Err = ();
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
@@ -59,8 +59,8 @@ macro_rules! fix_enum {
             }
         }
 
-        impl std::fmt::Display for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        impl core::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {
                     $( Self::$variant => f.write_str($code), )*
                 }
@@ -76,7 +76,7 @@ macro_rules! fix_enum {
             Other(String),
         }
 
-        impl std::str::FromStr for $name {
+        impl core::str::FromStr for $name {
             type Err = ();
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
@@ -86,8 +86,8 @@ macro_rules! fix_enum {
             }
         }
 
-        impl std::fmt::Display for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        impl core::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {
                     $( Self::$variant => f.write_str($code), )*
                     Self::Other(s) => f.write_str(s),

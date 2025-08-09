@@ -6,7 +6,7 @@ mod msg_type_tests {
 	use super::*;
 
 	#[test]
-	fn test_msg_type_from_str_valid_values() {
+	fn msg_type_from_str_valid_values() {
 		assert_eq!(MsgType::from_str("0").unwrap(), MsgType::Heartbeat);
 		assert_eq!(MsgType::from_str("1").unwrap(), MsgType::TestRequest);
 		assert_eq!(MsgType::from_str("8").unwrap(), MsgType::ExecutionReport);
@@ -16,7 +16,7 @@ mod msg_type_tests {
 	}
 
 	#[test]
-	fn test_msg_type_from_str_unknown_value() {
+	fn msg_type_from_str_unknown_value() {
 		match MsgType::from_str("Z").unwrap() {
 			MsgType::Other(s) => assert_eq!(s, "Z"),
 			_ => panic!("Expected Other variant"),
@@ -24,7 +24,7 @@ mod msg_type_tests {
 	}
 
 	#[test]
-	fn test_msg_type_display() {
+	fn msg_type_display() {
 		assert_eq!(format!("{}", MsgType::Heartbeat), "0");
 		assert_eq!(format!("{}", MsgType::TestRequest), "1");
 		assert_eq!(format!("{}", MsgType::ExecutionReport), "8");
@@ -34,7 +34,7 @@ mod msg_type_tests {
 	}
 
 	#[test]
-	fn test_msg_type_round_trip() {
+	fn msg_type_round_trip() {
 		let original_types = vec![
 			MsgType::Heartbeat,
 			MsgType::ExecutionReport,
@@ -55,13 +55,13 @@ mod side_tests {
 	use super::*;
 
 	#[test]
-	fn test_side_from_str_valid() {
+	fn side_from_str_valid() {
 		assert_eq!(Side::from_str("1").unwrap(), Side::Buy);
 		assert_eq!(Side::from_str("2").unwrap(), Side::Sell);
 	}
 
 	#[test]
-	fn test_side_from_str_invalid() {
+	fn side_from_str_invalid() {
 		assert!(Side::from_str("0").is_err());
 		assert!(Side::from_str("3").is_err());
 		assert!(Side::from_str("B").is_err());
@@ -69,13 +69,13 @@ mod side_tests {
 	}
 
 	#[test]
-	fn test_side_display() {
+	fn side_display() {
 		assert_eq!(format!("{}", Side::Buy), "1");
 		assert_eq!(format!("{}", Side::Sell), "2");
 	}
 
 	#[test]
-	fn test_side_round_trip() {
+	fn side_round_trip() {
 		let sides = vec![Side::Buy, Side::Sell];
 		for side in sides {
 			let str_repr = format!("{}", side);
@@ -90,7 +90,7 @@ mod ord_status_tests {
 	use super::*;
 
 	#[test]
-	fn test_ord_status_from_str_numeric() {
+	fn ord_status_from_str_numeric() {
 		assert_eq!(OrdStatus::from_str("0").unwrap(), OrdStatus::New);
 		assert_eq!(OrdStatus::from_str("1").unwrap(), OrdStatus::PartiallyFilled);
 		assert_eq!(OrdStatus::from_str("2").unwrap(), OrdStatus::Filled);
@@ -99,7 +99,7 @@ mod ord_status_tests {
 	}
 
 	#[test]
-	fn test_ord_status_from_str_alpha() {
+	fn ord_status_from_str_alpha() {
 		assert_eq!(OrdStatus::from_str("A").unwrap(), OrdStatus::PendingNew);
 		assert_eq!(OrdStatus::from_str("B").unwrap(), OrdStatus::Calculated);
 		assert_eq!(OrdStatus::from_str("C").unwrap(), OrdStatus::Expired);
@@ -108,7 +108,7 @@ mod ord_status_tests {
 	}
 
 	#[test]
-	fn test_ord_status_from_str_invalid() {
+	fn ord_status_from_str_invalid() {
 		assert!(OrdStatus::from_str("F").is_err());
 		assert!(OrdStatus::from_str("Z").is_err());
 		assert!(OrdStatus::from_str("10").is_err());
@@ -116,7 +116,7 @@ mod ord_status_tests {
 	}
 
 	#[test]
-	fn test_ord_status_display() {
+	fn ord_status_display() {
 		assert_eq!(format!("{}", OrdStatus::New), "0");
 		assert_eq!(format!("{}", OrdStatus::Filled), "2");
 		assert_eq!(format!("{}", OrdStatus::Canceled), "4");
@@ -125,7 +125,7 @@ mod ord_status_tests {
 	}
 
 	#[test]
-	fn test_ord_status_round_trip() {
+	fn ord_status_round_trip() {
 		let statuses = vec![
 			OrdStatus::New,
 			OrdStatus::PartiallyFilled,
@@ -148,7 +148,7 @@ mod fix_message_tests {
 	use super::*;
 
 	#[test]
-	fn test_new_fix_message_creation() {
+	fn new_fix_message_creation() {
 		let msg = FixMessage::new(
 			MsgType::Heartbeat,
 			"SENDER".to_string(),
@@ -168,7 +168,7 @@ mod fix_message_tests {
 	}
 
 	#[test]
-	fn test_default_fix_message() {
+	fn default_fix_message() {
 		let msg = FixMessage::default();
 
 		assert_eq!(msg.begin_string, "FIX.4.2");
@@ -176,11 +176,11 @@ mod fix_message_tests {
 		assert_eq!(msg.sender_comp_id, "SENDER");
 		assert_eq!(msg.target_comp_id, "TARGET");
 		assert_eq!(msg.msg_seq_num, 1);
-		assert_eq!(msg.sending_time, "20240101-00:00:00.000");
+		assert_eq!(msg.sending_time, "19700101-00:00:00.000");
 	}
 
 	#[test]
-	fn test_fix_message_optional_fields() {
+	fn fix_message_optional_fields() {
 		let mut msg = FixMessage::new(
 			MsgType::NewOrderSingle,
 			"CLIENT".to_string(),
@@ -208,7 +208,7 @@ mod fix_message_tests {
 	}
 
 	#[test]
-	fn test_additional_fields() {
+	fn additional_fields() {
 		let mut msg = FixMessage::default();
 
 		// Test setting and getting custom fields
@@ -225,7 +225,7 @@ mod fix_message_tests {
 	}
 
 	#[test]
-	fn test_is_valid() {
+	fn is_valid() {
 		// Valid message
 		let valid_msg = FixMessage::new(
 			MsgType::Heartbeat,
@@ -268,7 +268,7 @@ mod fix_message_tests {
 	}
 
 	#[test]
-	fn test_message_equality() {
+	fn message_equality() {
 		let msg1 = FixMessage::new(
 			MsgType::Heartbeat,
 			"SENDER".to_string(),
@@ -298,7 +298,7 @@ mod fix_message_tests {
 	}
 
 	#[test]
-	fn test_message_cloning() {
+	fn message_cloning() {
 		let original = FixMessage::default();
 		let cloned = original.clone();
 
@@ -314,7 +314,7 @@ mod integration_tests {
 	use super::*;
 
 	#[test]
-	fn test_new_order_single_workflow() {
+	fn new_order_single_workflow() {
 		// Create a New Order Single message
 		let mut new_order = FixMessage::new(
 			MsgType::NewOrderSingle,
@@ -329,9 +329,9 @@ mod integration_tests {
 		new_order.symbol = Some("MSFT".to_string());
 		new_order.side = Some(Side::Buy);
 		new_order.order_qty = Some(100.0);
-		new_order.ord_type = Some("2".to_string()); // Limit order
+		new_order.ord_type = Some("2".into()); // Limit order
 		new_order.price = Some(100.50);
-		new_order.time_in_force = Some("0".to_string()); // Day
+		new_order.time_in_force = Some("0".into()); // Day
 
 		assert!(new_order.is_valid());
 		assert_eq!(new_order.msg_type, MsgType::NewOrderSingle);
@@ -341,7 +341,7 @@ mod integration_tests {
 	}
 
 	#[test]
-	fn test_execution_report_workflow() {
+	fn execution_report_workflow() {
 		// Create an Execution Report in response to the order
 		let mut exec_report = FixMessage::new(
 			MsgType::ExecutionReport,
@@ -355,7 +355,7 @@ mod integration_tests {
 		exec_report.cl_ord_id = Some("ORDER123".to_string());
 		exec_report.order_id = Some("BROKER123".to_string());
 		exec_report.exec_id = Some("EXEC456".to_string());
-		exec_report.exec_type = Some("0".to_string()); // New
+		exec_report.exec_type = Some("0".into()); // New
 		exec_report.ord_status = Some(OrdStatus::New);
 		exec_report.symbol = Some("MSFT".to_string());
 		exec_report.side = Some(Side::Buy);
@@ -369,7 +369,7 @@ mod integration_tests {
 	}
 
 	#[test]
-	fn test_fill_execution_report() {
+	fn fill_execution_report() {
 		// Create a fill execution report
 		let mut fill_report = FixMessage::new(
 			MsgType::ExecutionReport,
@@ -382,7 +382,7 @@ mod integration_tests {
 		fill_report.cl_ord_id = Some("ORDER123".to_string());
 		fill_report.order_id = Some("BROKER123".to_string());
 		fill_report.exec_id = Some("EXEC789".to_string());
-		fill_report.exec_type = Some("F".to_string()); // Fill
+		fill_report.exec_type = Some("F".into()); // Fill
 		fill_report.ord_status = Some(OrdStatus::Filled);
 		fill_report.symbol = Some("MSFT".to_string());
 		fill_report.side = Some(Side::Buy);
@@ -400,7 +400,7 @@ mod integration_tests {
 	}
 
 	#[test]
-	fn test_heartbeat_message() {
+	fn heartbeat_message() {
 		let heartbeat = FixMessage::new(
 			MsgType::Heartbeat,
 			"CLIENT".to_string(),
