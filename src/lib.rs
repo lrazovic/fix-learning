@@ -4,6 +4,7 @@
 //! Financial Information eXchange (FIX) 4.2 protocol messages.
 
 pub mod macros;
+
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -50,6 +51,8 @@ fix_enum!(Strict OrdStatus {
     AcceptedForBidding => "D",
     PendingReplace     => "E",
 });
+
+const SOH: &str = &"\x01"; // SOH character
 
 // Main FIX 4.2 Message struct
 #[derive(Debug, Clone, PartialEq)]
@@ -379,7 +382,6 @@ impl FixMessage {
     /// Serialize the message to FIX wire format
     pub fn to_fix_string(&self) -> String {
         let mut fields = Vec::new();
-        let soh = '\x01'; // SOH character
 
         // Standard Header Fields (in order)
         fields.push(format!("8={}", self.begin_string));
@@ -485,7 +487,7 @@ impl FixMessage {
         }
 
         // Calculate body length
-        let body_string = body_fields.join(&soh.to_string());
+        let body_string = body_fields.join(SOH);
         let body_length = body_string.len();
         fields.push(format!("9={}", body_length));
 
@@ -493,12 +495,12 @@ impl FixMessage {
         fields.extend(body_fields);
 
         // Add checksum
-        let message_without_checksum = fields.join(&soh.to_string()) + &soh.to_string();
+        let message_without_checksum = fields.join(SOH) + SOH;
         let calculated_checksum = Self::calculate_checksum(&message_without_checksum);
         fields.push(format!("10={:03}", calculated_checksum));
 
         // Join all fields with SOH
-        fields.join(&soh.to_string())
+        fields.join(SOH)
     }
 
     /// Calculate FIX checksum
@@ -508,8 +510,7 @@ impl FixMessage {
 
     /// Parse a FIX message from wire format
     pub fn from_fix_string(fix_string: &str) -> Result<Self, String> {
-        let soh = '\x01';
-        let fields: Vec<&str> = fix_string.split(soh).filter(|s| !s.is_empty()).collect();
+        let fields: Vec<&str> = fix_string.split(SOH).filter(|s| !s.is_empty()).collect();
 
         if fields.is_empty() {
             return Err("Empty FIX message".to_string());
