@@ -51,7 +51,8 @@ fix_enum!(Strict OrdStatus {
 	PendingReplace     => "E",
 });
 
-const SOH: &str = "\x01"; // SOH character
+/// The Start of Heading control character, value 0x01, is used for field termination.
+const SOH: &str = "\x01";
 
 // Main FIX 4.2 Message struct
 #[derive(Debug, Clone, PartialEq)]
@@ -192,22 +193,22 @@ impl FixMessageBuilder {
 	}
 
 	/// Create a builder from an existing message
-	pub fn from_message(message: FixMessage) -> Self {
+	pub const fn from_message(message: FixMessage) -> Self {
 		Self { message }
 	}
 
 	// Header field setters
-	pub fn body_length(mut self, body_length: u32) -> Self {
+	pub const fn body_length(mut self, body_length: u32) -> Self {
 		self.message.body_length = body_length;
 		self
 	}
 
-	pub fn poss_dup_flag(mut self, flag: bool) -> Self {
+	pub const fn poss_dup_flag(mut self, flag: bool) -> Self {
 		self.message.poss_dup_flag = Some(flag);
 		self
 	}
 
-	pub fn poss_resend(mut self, flag: bool) -> Self {
+	pub const fn poss_resend(mut self, flag: bool) -> Self {
 		self.message.poss_resend = Some(flag);
 		self
 	}
@@ -238,7 +239,7 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn ord_status(mut self, ord_status: OrdStatus) -> Self {
+	pub const fn ord_status(mut self, ord_status: OrdStatus) -> Self {
 		self.message.ord_status = Some(ord_status);
 		self
 	}
@@ -253,12 +254,12 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn side(mut self, side: Side) -> Self {
+	pub const fn side(mut self, side: Side) -> Self {
 		self.message.side = Some(side);
 		self
 	}
 
-	pub fn order_qty(mut self, qty: f64) -> Self {
+	pub const fn order_qty(mut self, qty: f64) -> Self {
 		self.message.order_qty = Some(qty);
 		self
 	}
@@ -268,32 +269,32 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn price(mut self, price: f64) -> Self {
+	pub const fn price(mut self, price: f64) -> Self {
 		self.message.price = Some(price);
 		self
 	}
 
-	pub fn last_qty(mut self, qty: f64) -> Self {
+	pub const fn last_qty(mut self, qty: f64) -> Self {
 		self.message.last_qty = Some(qty);
 		self
 	}
 
-	pub fn last_px(mut self, price: f64) -> Self {
+	pub const fn last_px(mut self, price: f64) -> Self {
 		self.message.last_px = Some(price);
 		self
 	}
 
-	pub fn leaves_qty(mut self, qty: f64) -> Self {
+	pub const fn leaves_qty(mut self, qty: f64) -> Self {
 		self.message.leaves_qty = Some(qty);
 		self
 	}
 
-	pub fn cum_qty(mut self, qty: f64) -> Self {
+	pub const fn cum_qty(mut self, qty: f64) -> Self {
 		self.message.cum_qty = Some(qty);
 		self
 	}
 
-	pub fn avg_px(mut self, price: f64) -> Self {
+	pub const fn avg_px(mut self, price: f64) -> Self {
 		self.message.avg_px = Some(price);
 		self
 	}
