@@ -11,7 +11,7 @@ mod builder_pattern_tests {
 	use super::*;
 
 	#[test]
-	fn test_basic_builder_creation() {
+	fn basic_builder_creation() {
 		let message = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1, "20241201-12:00:00.000").build();
 
 		assert_eq!(message.msg_type, MsgType::Heartbeat);
@@ -22,7 +22,7 @@ mod builder_pattern_tests {
 	}
 
 	#[test]
-	fn test_builder_fluent_interface() {
+	fn builder_fluent_interface() {
 		let message = FixMessage::builder(MsgType::NewOrderSingle, "CLIENT", "BROKER", 100, "20241201-09:30:00.000")
 			.cl_ord_id("ORDER123")
 			.symbol("AAPL")
@@ -41,22 +41,22 @@ mod builder_pattern_tests {
 	}
 
 	#[test]
-	fn test_builder_with_custom_fields() {
+	fn builder_with_custom_fields() {
 		let message = FixMessage::builder(MsgType::ExecutionReport, "EXCHANGE", "CLIENT", 200, "20241201-10:00:00.000")
 			.symbol("MSFT")
 			.field(207, "NASDAQ") // SecurityExchange
 			.field(6000, "CUSTOM_DATA")
-			.field(9999, "TEST_FIELD")
+			.field(9999, "FIELD")
 			.build();
 
 		assert_eq!(message.symbol, Some("MSFT".to_string()));
 		assert_eq!(message.get_field(207), Some(&"NASDAQ".to_string()));
 		assert_eq!(message.get_field(6000), Some(&"CUSTOM_DATA".to_string()));
-		assert_eq!(message.get_field(9999), Some(&"TEST_FIELD".to_string()));
+		assert_eq!(message.get_field(9999), Some(&"FIELD".to_string()));
 	}
 
 	#[test]
-	fn test_builder_all_standard_fields() {
+	fn builder_all_standard_fields() {
 		let message = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 500, "20241201-11:30:00.000")
 			.cl_ord_id("CLIENT_ORDER_1")
 			.order_id("BROKER_ORDER_1")
@@ -97,7 +97,7 @@ mod builder_pattern_tests {
 	}
 
 	#[test]
-	fn test_builder_from_existing_message() {
+	fn builder_from_existing_message() {
 		let original = FixMessage::builder(MsgType::ExecutionReport, "PHLX", "PERS", 1, "20071123-05:30:00.000")
 			.cl_ord_id("ATOMNOCCC9990900")
 			.symbol("MSFT")
@@ -129,7 +129,7 @@ mod builder_pattern_tests {
 	}
 
 	#[test]
-	fn test_builder_optional_header_fields() {
+	fn builder_optional_header_fields() {
 		let message = FixMessage::builder(MsgType::TestRequest, "SENDER", "TARGET", 10, "20241201-12:00:00.000")
 			.poss_dup_flag(true)
 			.poss_resend(false)
@@ -147,7 +147,7 @@ mod serialization_tests {
 	use super::*;
 
 	#[test]
-	fn test_simple_message_serialization() {
+	fn simple_message_serialization() {
 		let message = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1, "20241201-12:00:00.000").build();
 
 		let fix_string = message.to_fix_string();
@@ -163,7 +163,7 @@ mod serialization_tests {
 	}
 
 	#[test]
-	fn test_new_order_single_serialization() {
+	fn new_order_single_serialization() {
 		let message =
 			FixMessage::builder(MsgType::NewOrderSingle, "TESTBUY3", "TESTSELL3", 972, "20190206-16:25:10.403")
 				.cl_ord_id("14163685067084226997921")
@@ -195,7 +195,7 @@ mod serialization_tests {
 	}
 
 	#[test]
-	fn test_execution_report_serialization() {
+	fn execution_report_serialization() {
 		let message = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 100, "20241201-10:30:00.000")
 			.cl_ord_id("ORDER_123")
 			.order_id("BROKER_456")
@@ -228,7 +228,7 @@ mod serialization_tests {
 	}
 
 	#[test]
-	fn test_checksum_calculation() {
+	fn checksum_calculation() {
 		let message = FixMessage::builder(MsgType::Heartbeat, "TEST", "DEST", 1, "20241201-12:00:00.000").build();
 
 		let fix_string = message.to_fix_string();
@@ -241,7 +241,7 @@ mod serialization_tests {
 	}
 
 	#[test]
-	fn test_body_length_calculation() {
+	fn body_length_calculation() {
 		let message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1, "20241201-12:00:00.000")
 			.cl_ord_id("TEST123")
 			.symbol("AAPL")
@@ -260,7 +260,7 @@ mod serialization_tests {
 	}
 
 	#[test]
-	fn test_field_ordering() {
+	fn field_ordering() {
 		let message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1, "20241201-12:00:00.000")
 			.field(6000, "CUSTOM1")
 			.field(207, "EXCHANGE")
@@ -284,7 +284,7 @@ mod parsing_tests {
 	use super::*;
 
 	#[test]
-	fn test_parse_simple_message() {
+	fn parse_simple_message() {
 		// Create a simple heartbeat message
 		let original = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1, "20241201-12:00:00.000").build();
 
@@ -300,7 +300,7 @@ mod parsing_tests {
 	}
 
 	#[test]
-	fn test_parse_new_order_single() {
+	fn parse_new_order_single() {
 		let fix_message = "8=FIX.4.2\x019=100\x0135=D\x0134=1\x0149=CLIENT\x0152=20241201-12:00:00.000\x0156=BROKER\x0111=ORDER123\x0138=100\x0140=2\x0154=1\x0155=AAPL\x0144=150.25\x0110=123\x01";
 
 		let parsed = FixMessage::from_fix_string(&fix_message).unwrap();
@@ -315,7 +315,7 @@ mod parsing_tests {
 	}
 
 	#[test]
-	fn test_parse_with_custom_fields() {
+	fn parse_with_custom_fields() {
 		let fix_message = "8=FIX.4.2\x019=50\x0135=8\x0134=1\x0149=BROKER\x0152=20241201-12:00:00.000\x0156=CLIENT\x01207=NASDAQ\x016000=CUSTOM\x0110=123\x01";
 
 		let parsed = FixMessage::from_fix_string(&fix_message).unwrap();
@@ -326,14 +326,14 @@ mod parsing_tests {
 	}
 
 	#[test]
-	fn test_parse_empty_message() {
+	fn parse_empty_message() {
 		let result = FixMessage::from_fix_string("");
 		assert!(result.is_err());
 		assert_eq!(result.unwrap_err(), "Empty FIX message");
 	}
 
 	#[test]
-	fn test_parse_malformed_field() {
+	fn parse_malformed_field() {
 		let fix_message = "8=FIX.4.2\x01INVALID_FIELD\x0135=0\x0110=123\x01";
 		let parsed = FixMessage::from_fix_string(&fix_message);
 
@@ -342,7 +342,7 @@ mod parsing_tests {
 	}
 
 	#[test]
-	fn test_round_trip_serialization() {
+	fn round_trip_serialization() {
 		let original =
 			FixMessage::builder(MsgType::ExecutionReport, "EXCHANGE", "CLIENT", 500, "20241201-15:30:00.000")
 				.cl_ord_id("CLIENT_ORDER_789")
@@ -378,7 +378,7 @@ mod real_world_examples {
 	use super::*;
 
 	#[test]
-	fn test_user_provided_message_structure() {
+	fn user_provided_message_structure() {
 		// Recreate the message structure from the user's example:
 		// "8=FIX.4.29=16335=D34=97249=TESTBUY352=20190206-16:25:10.40356=TESTSELL311=14163685067084226997921=238=10040=154=155=AAPL60=20190206-16:25:08.968207=TO6000=TEST123410=106"
 
@@ -417,7 +417,7 @@ mod real_world_examples {
 	}
 
 	#[test]
-	fn test_market_data_subscription() {
+	fn market_data_subscription() {
 		let message =
 			FixMessage::builder(MsgType::MarketDataRequest, "TRADING_SYS", "MD_PROVIDER", 250, "20241201-09:15:00.000")
 				.symbol("SPY")
@@ -444,7 +444,7 @@ mod real_world_examples {
 		use super::*;
 
 		#[test]
-		fn test_fromstr_trait_usage() {
+		fn fromstr_trait_usage() {
 			// Test clean FromStr usage for MsgType
 			let heartbeat: MsgType = "0".parse().unwrap();
 			let new_order: MsgType = "D".parse().unwrap();
@@ -472,7 +472,7 @@ mod real_world_examples {
 		}
 
 		#[test]
-		fn test_display_trait_usage() {
+		fn display_trait_usage() {
 			// Test Display trait for MsgType
 			assert_eq!(format!("{}", MsgType::Heartbeat), "0");
 			assert_eq!(format!("{}", MsgType::NewOrderSingle), "D");
@@ -491,7 +491,7 @@ mod real_world_examples {
 		}
 
 		#[test]
-		fn test_error_handling_with_fromstr() {
+		fn error_handling_with_fromstr() {
 			// Test error handling for invalid values
 			assert!(MsgType::from_str("INVALID").is_ok()); // MsgType never fails, creates Other
 			assert!(Side::from_str("invalid").is_err());
@@ -506,7 +506,7 @@ mod real_world_examples {
 		}
 
 		#[test]
-		fn test_builder_with_parsed_enums() {
+		fn builder_with_parsed_enums() {
 			// Demonstrate using parsed enums in builder pattern
 			let msg_type: MsgType = "D".parse().unwrap();
 			let side: Side = "1".parse().unwrap();
@@ -523,7 +523,7 @@ mod real_world_examples {
 		}
 
 		#[test]
-		fn test_round_trip_with_display_and_fromstr() {
+		fn round_trip_with_display_and_fromstr() {
 			let original_types = vec![
 				MsgType::Heartbeat,
 				MsgType::NewOrderSingle,
@@ -554,7 +554,7 @@ mod real_world_examples {
 		}
 
 		#[test]
-		fn test_automatic_string_conversion() {
+		fn automatic_string_conversion() {
 			// Demonstrate that Display automatically provides to_string()
 			let msg_type = MsgType::NewOrderSingle;
 			let side = Side::Buy;
@@ -580,7 +580,7 @@ mod real_world_examples {
 	}
 
 	#[test]
-	fn test_order_cancel_request() {
+	fn order_cancel_request() {
 		let message =
 			FixMessage::builder(MsgType::OrderCancelRequest, "CLIENT_SYS", "BROKER_SYS", 150, "20241201-10:45:00.000")
 				.cl_ord_id("CANCEL_REQ_001")
