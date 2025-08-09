@@ -6,7 +6,7 @@
 use fix_learning::{FixMessage, MsgType, OrdStatus, Side};
 
 fn main() {
-	println!("=== Clean API Demo: No More to_str() Methods! ===\n");
+	println!("=== Clean API Demo: No More .to_string() Methods! ===\n");
 
 	// Example 1: Clean enum parsing with FromStr
 	println!("1. Clean Enum Parsing:");
@@ -21,12 +21,8 @@ fn main() {
 
 	// Example 2: Automatic string conversion via Display trait
 	println!("2. Automatic String Conversion:");
-	let msg_types = vec![
-		MsgType::Heartbeat,
-		MsgType::NewOrderSingle,
-		MsgType::ExecutionReport,
-		MsgType::Other("CUSTOM".to_string()),
-	];
+	let msg_types =
+		vec![MsgType::Heartbeat, MsgType::NewOrderSingle, MsgType::ExecutionReport, MsgType::Other("CUSTOM".into())];
 
 	for msg_type in &msg_types {
 		// All of these work automatically due to Display trait
@@ -41,13 +37,13 @@ fn main() {
 	println!("3. Clean Builder Syntax:");
 	let message = FixMessage::builder(
 		"D".parse().unwrap(), // Clean parsing
-		"TRADER".to_string(),
-		"EXCHANGE".to_string(),
+		"TRADER",
+		"EXCHANGE",
 		1,
-		"20241201-09:30:00.000".to_string(),
+		"20241201-09:30:00.000",
 	)
-	.cl_ord_id("ORDER123".to_string())
-	.symbol("AAPL".to_string())
+	.cl_ord_id("ORDER123")
+	.symbol("AAPL")
 	.side("1".parse().unwrap()) // Clean parsing
 	.ord_status("0".parse().unwrap()) // Clean parsing
 	.order_qty(100.0)
@@ -87,7 +83,7 @@ fn main() {
 	}
 	println!();
 
-	// Example 6: Collections and iterations
+	// Example 6: Working with Collections:
 	println!("6. Working with Collections:");
 	let sides = vec![Side::Buy, Side::Sell];
 	let side_strings: Vec<String> = sides.iter().map(|s| s.to_string()).collect();

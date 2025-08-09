@@ -372,7 +372,7 @@ mod message_parsing_tests {
 		// Test parsing a real FIX message from https://robertwray.co.uk/blog/the-anatomy-of-a-fix-message
 		let fix_string = "8=FIX.4.2\x019=171\x0135=R\x0134=3257\x0149=COMP-PRICES\x0152=20180508-09:02:43.968\x0156=BANK-PRICES\x01131=Q-EURGBP-BUY-3357-636613669639680362\x01146=1\x0155=EUR/GBP\x0115=EUR\x0138=3357\x0140=C\x0154=1\x0164=20180508\x01167=FOR\x0110=150";
 
-		let result = FixMessage::from_fix_string(fix_string);
+		let result = FixMessage::from_fix_string(&fix_string);
 
 		assert!(result.is_ok(), "Failed to parse FIX message: {:?}", result.err());
 

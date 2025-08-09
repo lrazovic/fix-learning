@@ -5,7 +5,7 @@
 
 pub mod macros;
 
-use std::{collections::HashMap, str::FromStr};
+use std::{borrow::Cow, collections::HashMap, str::FromStr};
 
 // FIX 4.2 Message Types
 fix_enum!(Loose MsgType {
@@ -98,26 +98,26 @@ pub struct FixMessage {
 	pub additional_fields: HashMap<u32, String>,
 
 	// Trailer
-	pub checksum: String, // Tag 10 - Checksum
+	pub checksum: Cow<'static, str>, // Tag 10 - Checksum
 }
 
 impl FixMessage {
 	// Create a new FIX message with required fields
 	pub fn new(
 		msg_type: MsgType,
-		sender_comp_id: String,
-		target_comp_id: String,
+		sender_comp_id: impl Into<String>,
+		target_comp_id: impl Into<String>,
 		msg_seq_num: u32,
-		sending_time: String,
+		sending_time: impl Into<String>,
 	) -> Self {
 		FixMessage {
 			begin_string: "FIX.4.2".to_string(),
 			body_length: 0, // Will be calculated when serializing
 			msg_type,
-			sender_comp_id,
-			target_comp_id,
+			sender_comp_id: sender_comp_id.into(),
+			target_comp_id: target_comp_id.into(),
 			msg_seq_num,
-			sending_time,
+			sending_time: sending_time.into(),
 			poss_dup_flag: None,
 			poss_resend: None,
 			orig_sending_time: None,
@@ -144,13 +144,13 @@ impl FixMessage {
 			exec_ref_id: None,
 			exec_trans_type: None,
 			additional_fields: HashMap::new(),
-			checksum: "000".to_string(), // Will be calculated when serializing
+			checksum: Cow::Borrowed("000"), // Will be calculated when serializing
 		}
 	}
 
 	// Set a custom field
-	pub fn set_field(&mut self, tag: u32, value: String) {
-		self.additional_fields.insert(tag, value);
+	pub fn set_field(&mut self, tag: u32, value: impl Into<String>) {
+		self.additional_fields.insert(tag, value.into());
 	}
 
 	// Get a custom field
@@ -169,13 +169,7 @@ impl FixMessage {
 
 impl Default for FixMessage {
 	fn default() -> Self {
-		FixMessage::new(
-			MsgType::Heartbeat,
-			"SENDER".to_string(),
-			"TARGET".to_string(),
-			1,
-			"20240101-00:00:00.000".to_string(),
-		)
+		FixMessage::new(MsgType::Heartbeat, "SENDER", "TARGET", 1, "19700101-00:00:00.000")
 	}
 }
 
@@ -189,10 +183,10 @@ impl FixMessageBuilder {
 	/// Create a new builder with required fields
 	pub fn new(
 		msg_type: MsgType,
-		sender_comp_id: String,
-		target_comp_id: String,
+		sender_comp_id: impl Into<String>,
+		target_comp_id: impl Into<String>,
 		msg_seq_num: u32,
-		sending_time: String,
+		sending_time: impl Into<String>,
 	) -> Self {
 		Self { message: FixMessage::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num, sending_time) }
 	}
@@ -218,29 +212,29 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn orig_sending_time(mut self, time: String) -> Self {
-		self.message.orig_sending_time = Some(time);
+	pub fn orig_sending_time(mut self, time: impl Into<String>) -> Self {
+		self.message.orig_sending_time = Some(time.into());
 		self
 	}
 
 	// Body field setters
-	pub fn cl_ord_id(mut self, cl_ord_id: String) -> Self {
-		self.message.cl_ord_id = Some(cl_ord_id);
+	pub fn cl_ord_id(mut self, cl_ord_id: impl Into<String>) -> Self {
+		self.message.cl_ord_id = Some(cl_ord_id.into());
 		self
 	}
 
-	pub fn order_id(mut self, order_id: String) -> Self {
-		self.message.order_id = Some(order_id);
+	pub fn order_id(mut self, order_id: impl Into<String>) -> Self {
+		self.message.order_id = Some(order_id.into());
 		self
 	}
 
-	pub fn exec_id(mut self, exec_id: String) -> Self {
-		self.message.exec_id = Some(exec_id);
+	pub fn exec_id(mut self, exec_id: impl Into<String>) -> Self {
+		self.message.exec_id = Some(exec_id.into());
 		self
 	}
 
-	pub fn exec_type(mut self, exec_type: String) -> Self {
-		self.message.exec_type = Some(exec_type);
+	pub fn exec_type(mut self, exec_type: impl Into<String>) -> Self {
+		self.message.exec_type = Some(exec_type.into());
 		self
 	}
 
@@ -249,13 +243,13 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn symbol(mut self, symbol: String) -> Self {
-		self.message.symbol = Some(symbol);
+	pub fn symbol(mut self, symbol: impl Into<String>) -> Self {
+		self.message.symbol = Some(symbol.into());
 		self
 	}
 
-	pub fn security_type(mut self, security_type: String) -> Self {
-		self.message.security_type = Some(security_type);
+	pub fn security_type(mut self, security_type: impl Into<String>) -> Self {
+		self.message.security_type = Some(security_type.into());
 		self
 	}
 
@@ -269,8 +263,8 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn ord_type(mut self, ord_type: String) -> Self {
-		self.message.ord_type = Some(ord_type);
+	pub fn ord_type(mut self, ord_type: impl Into<String>) -> Self {
+		self.message.ord_type = Some(ord_type.into());
 		self
 	}
 
@@ -304,45 +298,45 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn text(mut self, text: String) -> Self {
-		self.message.text = Some(text);
+	pub fn text(mut self, text: impl Into<String>) -> Self {
+		self.message.text = Some(text.into());
 		self
 	}
 
-	pub fn time_in_force(mut self, tif: String) -> Self {
-		self.message.time_in_force = Some(tif);
+	pub fn time_in_force(mut self, tif: impl Into<String>) -> Self {
+		self.message.time_in_force = Some(tif.into());
 		self
 	}
 
-	pub fn exec_inst(mut self, exec_inst: String) -> Self {
-		self.message.exec_inst = Some(exec_inst);
+	pub fn exec_inst(mut self, exec_inst: impl Into<String>) -> Self {
+		self.message.exec_inst = Some(exec_inst.into());
 		self
 	}
 
-	pub fn handl_inst(mut self, handl_inst: String) -> Self {
-		self.message.handl_inst = Some(handl_inst);
+	pub fn handl_inst(mut self, handl_inst: impl Into<String>) -> Self {
+		self.message.handl_inst = Some(handl_inst.into());
 		self
 	}
 
-	pub fn exec_ref_id(mut self, exec_ref_id: String) -> Self {
-		self.message.exec_ref_id = Some(exec_ref_id);
+	pub fn exec_ref_id(mut self, exec_ref_id: impl Into<String>) -> Self {
+		self.message.exec_ref_id = Some(exec_ref_id.into());
 		self
 	}
 
-	pub fn exec_trans_type(mut self, exec_trans_type: String) -> Self {
-		self.message.exec_trans_type = Some(exec_trans_type);
+	pub fn exec_trans_type(mut self, exec_trans_type: impl Into<String>) -> Self {
+		self.message.exec_trans_type = Some(exec_trans_type.into());
 		self
 	}
 
 	// Custom field setter
-	pub fn field(mut self, tag: u32, value: String) -> Self {
+	pub fn field(mut self, tag: u32, value: impl Into<String>) -> Self {
 		self.message.set_field(tag, value);
 		self
 	}
 
 	// Checksum setter
-	pub fn checksum(mut self, checksum: String) -> Self {
-		self.message.checksum = checksum;
+	pub fn checksum(mut self, checksum: impl Into<String>) -> Self {
+		self.message.checksum = Cow::Owned(checksum.into());
 		self
 	}
 
@@ -356,10 +350,10 @@ impl FixMessage {
 	/// Create a new builder for this message type
 	pub fn builder(
 		msg_type: MsgType,
-		sender_comp_id: String,
-		target_comp_id: String,
+		sender_comp_id: impl Into<String>,
+		target_comp_id: impl Into<String>,
 		msg_seq_num: u32,
-		sending_time: String,
+		sending_time: impl Into<String>,
 	) -> FixMessageBuilder {
 		FixMessageBuilder::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num, sending_time)
 	}
@@ -506,38 +500,38 @@ impl FixMessage {
 		for field in fields {
 			if let Some((tag_str, value)) = field.split_once('=') {
 				match tag_str.parse::<u32>() {
-					Ok(8) => message.begin_string = value.to_string(),
+					Ok(8) => message.begin_string = value.into(),
 					Ok(9) => message.body_length = value.parse().unwrap_or(0),
-					Ok(35) => message.msg_type = MsgType::from_str(value).unwrap_or(MsgType::Other(value.to_string())),
+					Ok(35) => message.msg_type = MsgType::from_str(value).unwrap_or(MsgType::Other(value.into())),
 					Ok(34) => message.msg_seq_num = value.parse().unwrap_or(0),
-					Ok(49) => message.sender_comp_id = value.to_string(),
-					Ok(52) => message.sending_time = value.to_string(),
-					Ok(56) => message.target_comp_id = value.to_string(),
-					Ok(11) => message.cl_ord_id = Some(value.to_string()),
-					Ok(37) => message.order_id = Some(value.to_string()),
-					Ok(17) => message.exec_id = Some(value.to_string()),
-					Ok(150) => message.exec_type = Some(value.to_string()),
+					Ok(49) => message.sender_comp_id = value.into(),
+					Ok(52) => message.sending_time = value.into(),
+					Ok(56) => message.target_comp_id = value.into(),
+					Ok(11) => message.cl_ord_id = Some(value.into()),
+					Ok(37) => message.order_id = Some(value.into()),
+					Ok(17) => message.exec_id = Some(value.into()),
+					Ok(150) => message.exec_type = Some(value.into()),
 					Ok(39) => message.ord_status = OrdStatus::from_str(value).ok(),
-					Ok(55) => message.symbol = Some(value.to_string()),
-					Ok(167) => message.security_type = Some(value.to_string()),
+					Ok(55) => message.symbol = Some(value.into()),
+					Ok(167) => message.security_type = Some(value.into()),
 					Ok(54) => message.side = Side::from_str(value).ok(),
 					Ok(38) => message.order_qty = value.parse().ok(),
-					Ok(40) => message.ord_type = Some(value.to_string()),
+					Ok(40) => message.ord_type = Some(value.into()),
 					Ok(44) => message.price = value.parse().ok(),
 					Ok(32) => message.last_qty = value.parse().ok(),
 					Ok(31) => message.last_px = value.parse().ok(),
 					Ok(151) => message.leaves_qty = value.parse().ok(),
 					Ok(14) => message.cum_qty = value.parse().ok(),
 					Ok(6) => message.avg_px = value.parse().ok(),
-					Ok(58) => message.text = Some(value.to_string()),
-					Ok(59) => message.time_in_force = Some(value.to_string()),
-					Ok(18) => message.exec_inst = Some(value.to_string()),
-					Ok(21) => message.handl_inst = Some(value.to_string()),
-					Ok(19) => message.exec_ref_id = Some(value.to_string()),
-					Ok(20) => message.exec_trans_type = Some(value.to_string()),
-					Ok(10) => message.checksum = value.to_string(),
+					Ok(58) => message.text = Some(value.into()),
+					Ok(59) => message.time_in_force = Some(value.into()),
+					Ok(18) => message.exec_inst = Some(value.into()),
+					Ok(21) => message.handl_inst = Some(value.into()),
+					Ok(19) => message.exec_ref_id = Some(value.into()),
+					Ok(20) => message.exec_trans_type = Some(value.into()),
+					Ok(10) => message.checksum = Cow::Owned(value.into()),
 					Ok(tag) => {
-						message.additional_fields.insert(tag, value.to_string());
+						message.additional_fields.insert(tag, value.into());
 					},
 					Err(_) => return Err(format!("Invalid tag: {}", tag_str)),
 				}
