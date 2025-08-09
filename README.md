@@ -5,6 +5,7 @@ A Rust implementation of Financial Information eXchange (FIX) 4.2 protocol messa
 ## Overview
 
 This project provides a comprehensive struct-based representation of FIX 4.2 messages, including:
+
 - Standard message types (Heartbeat, ExecutionReport, NewOrderSingle, etc.)
 - **Builder pattern** for fluent message construction
 - **FIX serialization** to/from wire format with automatic checksum calculation
@@ -64,21 +65,21 @@ cargo test test_parse_real_fix_message
 ```rust
 use fix_learning::{FixMessage, MsgType, Side};
 
-// Create a New Order Single using FromStr trait (idiomatic Rust)
+// Create a New Order Single - clean API without forced .to_string() calls!
 let new_order = FixMessage::builder(
     "D".parse().unwrap(),               // MsgType::NewOrderSingle using FromStr
-    "TRADER".to_string(),
-    "EXCHANGE".to_string(),
+    "TRADER",                           // Direct string literals work!
+    "EXCHANGE",                         // No .to_string() needed
     100,
-    "20241201-09:30:00.000".to_string(),
+    "20241201-09:30:00.000",           // Clean and simple
 )
-.cl_ord_id("ORDER_001".to_string())
-.symbol("AAPL".to_string())
-.side("1".parse().unwrap())             // Side::Buy using FromStr
+.cl_ord_id("ORDER_001")                // No .to_string() boilerplate
+.symbol("AAPL")                        // Much cleaner API
+.side("1".parse().unwrap())            // Side::Buy using FromStr
 .order_qty(100.0)
-.ord_type("2".to_string()) // Limit order
+.ord_type("2")                         // Direct string usage
 .price(150.25)
-.time_in_force("0".to_string()) // Day order
+.time_in_force("0")                    // No conversion needed
 .build();
 
 // Serialize to FIX wire format
@@ -86,10 +87,10 @@ let fix_string = new_order.to_fix_string();
 println!("{}", fix_string);
 // Output: 8=FIX.4.2^A9=120^A35=D^A34=100^A49=TRADER^A...
 
-// Clean enum conversions - no to_str() methods needed!
+// Clean enum conversions - uses standard Rust traits!
 let msg_type: MsgType = "8".parse().unwrap();  // ExecutionReport
 let side: Side = "2".parse().unwrap();         // Sell
-println!("Message: {}, Side: {}", msg_type, side); // Uses Display trait automatically
+println!("Message: {}, Side: {}", msg_type, side); // Display trait works automatically
 ```
 
 ### Recreating Your Original Message
@@ -99,20 +100,20 @@ Based on your original FIX string, here's how to build it with the builder patte
 ```rust
 let user_message = FixMessage::builder(
     "D".parse().unwrap(),               // MsgType::NewOrderSingle using FromStr
-    "TESTBUY3".to_string(),
-    "TESTSELL3".to_string(),
+    "TESTBUY3",
+    "TESTSELL3",
     972,
-    "20190206-16:25:10.403".to_string(),
+    "20190206-16:25:10.403",
 )
-.cl_ord_id("14163685067084226997921".to_string())
+.cl_ord_id("14163685067084226997921")
 .order_qty(100.0)
-.ord_type("1".to_string()) // Market order
-.side("1".parse().unwrap())                      // Side::Buy using FromStr
-.symbol("AAPL".to_string())
-.field(21, "2".to_string())                      // HandlInst
-.field(60, "20190206-16:25:08.968".to_string())  // TransactTime
-.field(207, "TO".to_string())                    // SecurityExchange
-.field(6000, "TEST1234".to_string())             // Custom field
+.ord_type("1")                         // Market order
+.side("1".parse().unwrap())            // Side::Buy using FromStr
+.symbol("AAPL")                        // Simple and clean
+.field(21, "2")                        // HandlInst
+.field(60, "20190206-16:25:08.968")    // TransactTime
+.field(207, "TO")                      // SecurityExchange
+.field(6000, "TEST1234")               // Custom field
 .build();
 
 let fix_string = user_message.to_fix_string();
@@ -126,10 +127,10 @@ use fix_learning::{FixMessage, MsgType};
 
 let heartbeat = FixMessage::new(
     MsgType::Heartbeat,
-    "CLIENT".to_string(),
-    "BROKER".to_string(),
+    "CLIENT",
+    "BROKER",
     1,
-    "20241201-12:00:00.000".to_string(),
+    "20241201-12:00:00.000",
 );
 ```
 
@@ -138,9 +139,8 @@ let heartbeat = FixMessage::new(
 ```rust
 let mut message = FixMessage::default();
 
-// Set custom fields using tag numbers
-message.set_field(9999, "custom_value".to_string());
-message.set_field(8888, "another_value".to_string());
+message.set_field(9999, "custom_value");
+message.set_field(8888, "another_value");
 
 // Retrieve custom fields
 if let Some(value) = message.get_field(9999) {
@@ -151,11 +151,11 @@ if let Some(value) = message.get_field(9999) {
 ### FIX Message Serialization
 
 ```rust
-// Build a message using idiomatic FromStr
-let message = FixMessage::builder("8".parse().unwrap(), ...) // ExecutionReport
-    .symbol("MSFT".to_string())
-    .side("1".parse().unwrap()) // Buy
-    .ord_status("2".parse().unwrap()) // Filled
+// Build a message using clean API
+let message = FixMessage::builder("8".parse().unwrap(), "TRADER", "EXCHANGE", 1, "20241201-09:30:00.000") // ExecutionReport
+    .symbol("MSFT")                    // No .to_string() needed!
+    .side("1".parse().unwrap())        // Buy
+    .ord_status("2".parse().unwrap())  // Filled
     .build();
 
 // Serialize to FIX wire format (with SOH separators, uses Display trait)
@@ -168,12 +168,13 @@ let parsed = FixMessage::from_fix_string(&fix_string)?;
 let msg_type: MsgType = "D".parse()?;     // NewOrderSingle
 let side: Side = "1".parse()?;            // Buy
 let status: OrdStatus = "0".parse()?;     // New
-println!("Type: {}, Side: {}, Status: {}", msg_type, side, status); // No to_str() needed!
+println!("Type: {}, Side: {}, Status: {}", msg_type, side, status); // Display trait works automatically!
 ```
 
 ## FIX 4.2 Message Structure
 
 ### Standard Header Fields
+
 - `begin_string` (Tag 8): Protocol version "FIX.4.2"
 - `body_length` (Tag 9): Message body length
 - `msg_type` (Tag 35): Message type
@@ -183,11 +184,13 @@ println!("Type: {}, Side: {}, Status: {}", msg_type, side, status); // No to_str
 - `sending_time` (Tag 52): Message transmission time
 
 ### Common Body Fields
+
 - Order fields: `cl_ord_id`, `order_id`, `symbol`, `side`, `order_qty`
 - Execution fields: `exec_id`, `exec_type`, `ord_status`, `last_qty`, `last_px`
 - Price fields: `price`, `cum_qty`, `leaves_qty`, `avg_px`
 
 ### Standard Trailer
+
 - `checksum` (Tag 10): Message checksum
 
 ## Example Trading Workflows
@@ -225,7 +228,7 @@ The integration tests demonstrate several real-world scenarios:
 
 ### Key Methods
 
-- **`FixMessage::builder(...)`**: Create a new builder
+- **`FixMessage::builder(...)`**: Create a new builder (accepts string literals directly!)
 - **`FixMessage::to_fix_string()`**: Serialize to FIX wire format
 - **`FixMessage::from_fix_string()`**: Parse from FIX wire format
 - **`builder.field(tag, value)`**: Set custom field
@@ -233,7 +236,6 @@ The integration tests demonstrate several real-world scenarios:
 - **`"D".parse::<MsgType>()`**: Parse enum from string using `FromStr`
 - **`format!("{}", msg_type)`**: Format enum to string using `Display`
 - **`msg_type.to_string()`**: Automatic string conversion via `Display` trait
-- **No custom `to_str()` methods needed!**
 
 ## License
 
