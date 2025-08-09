@@ -11,7 +11,7 @@ mod trading_workflow_tests {
 	use super::*;
 
 	#[test]
-	fn test_complete_order_lifecycle() {
+	fn complete_order_lifecycle() {
 		// 1. Client sends New Order Single
 		let mut new_order = FixMessage::new(
 			MsgType::NewOrderSingle,
@@ -112,7 +112,7 @@ mod trading_workflow_tests {
 	}
 
 	#[test]
-	fn test_order_cancel_workflow() {
+	fn order_cancel_workflow() {
 		// 1. Original order
 		let mut original_order = FixMessage::new(
 			MsgType::NewOrderSingle,
@@ -186,7 +186,7 @@ mod trading_workflow_tests {
 	}
 
 	#[test]
-	fn test_order_replace_workflow() {
+	fn order_replace_workflow() {
 		// 1. Original order
 		let original_cl_ord_id = "PROP_TRADE_100";
 		let new_cl_ord_id = "PROP_TRADE_100_R1";
@@ -238,7 +238,7 @@ mod trading_workflow_tests {
 	}
 
 	#[test]
-	fn test_heartbeat_sequence() {
+	fn heartbeat_sequence() {
 		let mut sequence_num = 100;
 
 		// Heartbeat from client to server
@@ -268,7 +268,7 @@ mod trading_workflow_tests {
 	}
 
 	#[test]
-	fn test_market_data_request_workflow() {
+	fn market_data_request_workflow() {
 		// Market data subscription request
 		let mut md_request = FixMessage::new(
 			MsgType::MarketDataRequest,
@@ -306,7 +306,7 @@ mod trading_workflow_tests {
 	}
 
 	#[test]
-	fn test_reject_message() {
+	fn reject_message() {
 		// Invalid order that gets rejected
 		let mut reject_msg = FixMessage::new(
 			MsgType::Reject,
@@ -328,7 +328,7 @@ mod trading_workflow_tests {
 	}
 
 	#[test]
-	fn test_security_definition_workflow() {
+	fn security_definition_workflow() {
 		// Security definition request
 		let mut sec_def_request = FixMessage::new(
 			MsgType::SecurityDefinitionRequest,
@@ -368,8 +368,9 @@ mod message_parsing_tests {
 	use super::*;
 
 	#[test]
-	fn test_parse_real_fix_message() {
-		// Test parsing a real FIX message from https://robertwray.co.uk/blog/the-anatomy-of-a-fix-message
+	fn parse_quote_request_message() {
+		// Test parsing a real FIX message.
+		// Source: https://robertwray.co.uk/blog/the-anatomy-of-a-fix-message
 		let fix_string = "8=FIX.4.2\x019=171\x0135=R\x0134=3257\x0149=COMP-PRICES\x0152=20180508-09:02:43.968\x0156=BANK-PRICES\x01131=Q-EURGBP-BUY-3357-636613669639680362\x01146=1\x0155=EUR/GBP\x0115=EUR\x0138=3357\x0140=C\x0154=1\x0164=20180508\x01167=FOR\x0110=150";
 
 		let result = FixMessage::from_fix_string(&fix_string);
@@ -403,13 +404,212 @@ mod message_parsing_tests {
 		// Verify the message is considered valid
 		assert!(message.is_valid());
 	}
+
+	#[test]
+	fn parse_new_order_single_message() {
+		// Test parsing the user-provided FIX message: NewOrderSingle from TESTBUY3 to TESTSELL3
+		// Source: https://www.fixsim.com/sample-fix-messages
+		let fix_string = "8=FIX.4.2\x019=163\x0135=D\x0134=972\x0149=TESTBUY3\x0152=20190206-16:25:10.403\x0156=TESTSELL3\x0111=14163685067084226997921\x0121=2\x0138=100\x0140=1\x0154=1\x0155=AAPL\x0160=20190206-16:25:08.968\x01207=TO\x016000=TEST1234\x0110=106";
+
+		let result = FixMessage::from_fix_string(&fix_string);
+
+		assert!(result.is_ok(), "Failed to parse user-provided FIX message: {:?}", result.err());
+
+		let message = result.unwrap();
+
+		// Verify standard header fields
+		assert_eq!(message.begin_string, "FIX.4.2");
+		assert_eq!(message.body_length, 163);
+		assert_eq!(message.msg_type, MsgType::NewOrderSingle);
+		assert_eq!(message.msg_seq_num, 972);
+		assert_eq!(message.sender_comp_id, "TESTBUY3");
+		assert_eq!(message.sending_time, "20190206-16:25:10.403");
+		assert_eq!(message.target_comp_id, "TESTSELL3");
+
+		// Verify order-specific fields
+		assert_eq!(message.cl_ord_id, Some("14163685067084226997921".to_string()));
+		assert_eq!(message.symbol, Some("AAPL".to_string()));
+		assert_eq!(message.side, Some(Side::Buy));
+		assert_eq!(message.order_qty, Some(100.0));
+		assert_eq!(message.ord_type, Some("1".to_string())); // Market order
+
+		// Verify additional fields (known fields are parsed into dedicated struct fields)
+		assert_eq!(message.handl_inst, Some("2".to_string())); // HandlInst (tag 21)
+		assert_eq!(message.get_field(60), Some(&"20190206-16:25:08.968".to_string())); // TransactTime
+		assert_eq!(message.get_field(207), Some(&"TO".to_string())); // SecurityExchange
+		assert_eq!(message.get_field(6000), Some(&"TEST1234".to_string())); // Custom field
+
+		// Verify checksum
+		assert_eq!(message.checksum, "106");
+
+		// Verify the message is considered valid
+		assert!(message.is_valid());
+
+		// Test round-trip serialization
+		let serialized = message.to_fix_string();
+		let reparsed = FixMessage::from_fix_string(&serialized).unwrap();
+
+		// Key fields should match after round-trip
+		assert_eq!(reparsed.msg_type, message.msg_type);
+		assert_eq!(reparsed.sender_comp_id, message.sender_comp_id);
+		assert_eq!(reparsed.target_comp_id, message.target_comp_id);
+		assert_eq!(reparsed.cl_ord_id, message.cl_ord_id);
+		assert_eq!(reparsed.symbol, message.symbol);
+		assert_eq!(reparsed.side, message.side);
+		assert_eq!(reparsed.order_qty, message.order_qty);
+	}
+
+	#[test]
+	fn parse_execution_report_message() {
+		// Test parsing the user-provided Execution Report FIX message: TESTSELL3 to TESTBUY3
+		// Source: https://www.fixsim.com/sample-fix-messages
+		let fix_string = "8=FIX.4.2\x019=271\x0135=8\x0134=974\x0149=TESTSELL3\x0152=20190206-16:26:09.059\x0156=TESTBUY3\x016=174.51\x0111=1416368506708422699791\x0114=100.00000000001\x0117=36368506716843579792\x0120=0\x0121=2\x0131=174.51\x0132=100.00000000003\x0137=10054483\x0138=100\x0139=2\x0140=1\x0154=1\x0155=AAPL\x0160=20190206-16:26:08.435\x01150=2\x01151=0.00000000001\x0110=194";
+
+		let result = FixMessage::from_fix_string(&fix_string);
+
+		assert!(result.is_ok(), "Failed to parse execution report FIX message: {:?}", result.err());
+
+		let message = result.unwrap();
+
+		// Verify standard header fields
+		assert_eq!(message.begin_string, "FIX.4.2");
+		assert_eq!(message.body_length, 271);
+		assert_eq!(message.msg_type, MsgType::ExecutionReport);
+		assert_eq!(message.msg_seq_num, 974);
+		assert_eq!(message.sender_comp_id, "TESTSELL3");
+		assert_eq!(message.sending_time, "20190206-16:26:09.059");
+		assert_eq!(message.target_comp_id, "TESTBUY3");
+
+		// Verify execution-specific fields
+		assert_eq!(message.cl_ord_id, Some("1416368506708422699791".to_string()));
+		assert_eq!(message.order_id, Some("10054483".to_string()));
+		assert_eq!(message.exec_id, Some("36368506716843579792".to_string()));
+		assert_eq!(message.symbol, Some("AAPL".to_string()));
+		assert_eq!(message.side, Some(Side::Buy));
+		assert_eq!(message.order_qty, Some(100.0));
+		assert_eq!(message.ord_type, Some("1".to_string())); // Market order
+		assert_eq!(message.ord_status, Some(OrdStatus::Filled));
+		assert_eq!(message.avg_px, Some(174.51));
+		assert_eq!(message.cum_qty, Some(100.00000000001));
+		assert_eq!(message.last_px, Some(174.51));
+		assert_eq!(message.last_qty, Some(100.00000000003));
+		assert_eq!(message.leaves_qty, Some(0.00000000001));
+
+		// Verify additional fields
+		assert_eq!(message.handl_inst, Some("2".to_string())); // HandlInst (tag 21)
+		assert_eq!(message.exec_trans_type, Some("0".to_string())); // ExecTransType (tag 20)
+		assert_eq!(message.exec_type, Some("2".to_string())); // ExecType (tag 150) - Fill
+
+		// Verify checksum
+		assert_eq!(message.checksum, "194");
+
+		// Verify the message is considered valid
+		assert!(message.is_valid());
+
+		// Test round-trip serialization
+		let serialized = message.to_fix_string();
+		let reparsed = FixMessage::from_fix_string(&serialized).unwrap();
+
+		// Key fields should match after round-trip
+		assert_eq!(reparsed.msg_type, message.msg_type);
+		assert_eq!(reparsed.sender_comp_id, message.sender_comp_id);
+		assert_eq!(reparsed.target_comp_id, message.target_comp_id);
+		assert_eq!(reparsed.cl_ord_id, message.cl_ord_id);
+		assert_eq!(reparsed.order_id, message.order_id);
+		assert_eq!(reparsed.exec_id, message.exec_id);
+		assert_eq!(reparsed.symbol, message.symbol);
+		assert_eq!(reparsed.side, message.side);
+		assert_eq!(reparsed.ord_status, message.ord_status);
+		assert_eq!(reparsed.avg_px, message.avg_px);
+	}
+
+	#[test]
+	fn parse_logon_message() {
+		// Test parsing the user-provided Logon FIX message: TESTSELL3 to TESTBUY3
+		// Source: https://www.fixsim.com/sample-fix-messages
+		let fix_string = "8=FIX.4.2\x019=74\x0135=A\x0134=978\x0149=TESTSELL3\x0152=20190206-16:29:19.208\x0156=TESTBUY3\x0198=0\x01108=60\x0110=137";
+
+		let result = FixMessage::from_fix_string(&fix_string);
+
+		assert!(result.is_ok(), "Failed to parse logon FIX message: {:?}", result.err());
+
+		let message = result.unwrap();
+
+		// Verify standard header fields
+		assert_eq!(message.begin_string, "FIX.4.2");
+		assert_eq!(message.body_length, 74);
+		assert_eq!(message.msg_type, MsgType::Other("A".to_string())); // Logon
+		assert_eq!(message.msg_seq_num, 978);
+		assert_eq!(message.sender_comp_id, "TESTSELL3");
+		assert_eq!(message.sending_time, "20190206-16:29:19.208");
+		assert_eq!(message.target_comp_id, "TESTBUY3");
+
+		// Verify logon-specific fields (as additional fields since they're not standard body fields)
+		assert_eq!(message.get_field(98), Some(&"0".to_string())); // EncryptMethod
+		assert_eq!(message.get_field(108), Some(&"60".to_string())); // HeartBtInt
+
+		// Verify checksum
+		assert_eq!(message.checksum, "137");
+
+		// Verify the message is considered valid
+		assert!(message.is_valid());
+
+		// Test round-trip serialization
+		let serialized = message.to_fix_string();
+		let reparsed = FixMessage::from_fix_string(&serialized).unwrap();
+
+		// Key fields should match after round-trip
+		assert_eq!(reparsed.msg_type, message.msg_type);
+		assert_eq!(reparsed.sender_comp_id, message.sender_comp_id);
+		assert_eq!(reparsed.target_comp_id, message.target_comp_id);
+		assert_eq!(reparsed.msg_seq_num, message.msg_seq_num);
+	}
+
+	#[test]
+	fn parse_logout_message() {
+		// Test parsing the user-provided Logout FIX message: TESTSELL3 to TESTBUY3
+		// Source: https://www.fixsim.com/sample-fix-messages
+		let fix_string =
+			"8=FIX.4.2\x019=62\x0135=5\x0134=977\x0149=TESTSELL3\x0152=20190206-16:28:51.518\x0156=TESTBUY3\x0110=092";
+
+		let result = FixMessage::from_fix_string(&fix_string);
+
+		assert!(result.is_ok(), "Failed to parse logout FIX message: {:?}", result.err());
+
+		let message = result.unwrap();
+
+		// Verify standard header fields
+		assert_eq!(message.begin_string, "FIX.4.2");
+		assert_eq!(message.body_length, 62);
+		assert_eq!(message.msg_type, MsgType::Logout);
+		assert_eq!(message.msg_seq_num, 977);
+		assert_eq!(message.sender_comp_id, "TESTSELL3");
+		assert_eq!(message.sending_time, "20190206-16:28:51.518");
+		assert_eq!(message.target_comp_id, "TESTBUY3");
+
+		// Verify checksum
+		assert_eq!(message.checksum, "092");
+
+		// Verify the message is considered valid
+		assert!(message.is_valid());
+
+		// Test round-trip serialization
+		let serialized = message.to_fix_string();
+		let reparsed = FixMessage::from_fix_string(&serialized).unwrap();
+
+		// Key fields should match after round-trip
+		assert_eq!(reparsed.msg_type, message.msg_type);
+		assert_eq!(reparsed.sender_comp_id, message.sender_comp_id);
+		assert_eq!(reparsed.target_comp_id, message.target_comp_id);
+		assert_eq!(reparsed.msg_seq_num, message.msg_seq_num);
+	}
 }
 
 mod error_handling_tests {
 	use super::*;
 
 	#[test]
-	fn test_invalid_message_validation() {
+	fn invalid_message_validation() {
 		// Test various invalid message scenarios
 		let mut invalid_msg = FixMessage::default();
 
@@ -433,7 +633,7 @@ mod error_handling_tests {
 	}
 
 	#[test]
-	fn test_enum_edge_cases() {
+	fn enum_edge_cases() {
 		// Test Side enum edge cases
 		assert!(Side::from_str("").is_err());
 		assert!(Side::from_str("3").is_err());
@@ -452,7 +652,7 @@ mod error_handling_tests {
 	}
 
 	#[test]
-	fn test_field_operations_edge_cases() {
+	fn field_operations_edge_cases() {
 		let mut msg = FixMessage::default();
 
 		// Test getting non-existent field
