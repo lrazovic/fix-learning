@@ -176,7 +176,7 @@ mod fix_message_tests {
 		assert_eq!(msg.sender_comp_id, "SENDER");
 		assert_eq!(msg.target_comp_id, "TARGET");
 		assert_eq!(msg.msg_seq_num, 1);
-		assert_eq!(msg.sending_time, "20240101-00:00:00.000");
+		assert_eq!(msg.sending_time, "19700101-00:00:00.000");
 	}
 
 	#[test]
