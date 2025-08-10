@@ -3,7 +3,7 @@
 //! This example shows how the removal of custom to_str() methods
 //! makes the API more idiomatic and cleaner to use.
 
-use fix_learning::{FixMessage, MsgType, OrdStatus, Side};
+use fix_learning::{FixMessage, MsgType, OrdStatus, Side, Validate};
 use time::OffsetDateTime;
 
 fn main() {
@@ -46,14 +46,11 @@ fn main() {
 	.cl_ord_id("ORDER123")
 	.symbol("AAPL")
 	.side("1".parse().unwrap()) // Clean parsing
-	.ord_status("0".parse().unwrap()) // Clean parsing
 	.order_qty(100.0)
 	.price(150.25)
 	.build();
 
-	println!("  Built message type: {}", message.msg_type);
-	println!("  Built message side: {:?}", message.side);
-	println!("  Built message status: {:?}", message.ord_status);
+	println!("  Built message type: {}", message.header.msg_type);
 	println!();
 
 	// Example 4: Format strings and interpolation
@@ -99,13 +96,12 @@ fn main() {
 	// Example 7: Serialization preview
 	println!("7. Message Serialization:");
 	let fix_string = message.to_fix_string();
-	let readable = fix_string.replace('\x01', " | ");
-	println!("  FIX String: {}", readable);
+	println!("  FIX String: {}", message);
 
 	// Parse it back
 	match FixMessage::from_fix_string(&fix_string) {
 		Ok(parsed) => {
-			println!("  Parsed back - Type: {}, Side: {:?}", parsed.msg_type, parsed.side);
+			println!("  Parsed back - Type: {}, Is Valid: {:?}", parsed.header.msg_type, parsed.body.is_valid());
 		},
 		Err(e) => println!("  Parse error: {}", e),
 	}

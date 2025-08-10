@@ -3,19 +3,14 @@
 //! This module contains the standard FIX message header structure
 //! that is common to all FIX messages, along with its validation logic.
 
-use crate::common::{
-	enums::MsgType,
-	validation::{Validate, ValidationError, utils},
+use crate::{
+	FORMAT_TIME,
+	common::{
+		enums::MsgType,
+		validation::{Validate, ValidationError},
+	},
 };
-use time::{
-	Duration, OffsetDateTime, PrimitiveDateTime, UtcOffset, format_description::BorrowedFormatItem,
-	macros::format_description,
-};
-
-/// Time/date combination represented in UTC (Universal Time Coordinated, also known as "GMT")
-/// in either YYYYMMDD-HH:MM:SS (whole seconds) or YYYYMMDD-HH:MM:SS.sss (milliseconds) format, colons, dash, and period required.
-static FORMAT_TIME: &[BorrowedFormatItem<'_>] =
-	format_description!("[year][month][day]-[hour]:[minute]:[second].[subsecond digits:3]");
+use time::{Duration, OffsetDateTime, PrimitiveDateTime, UtcOffset, macros::format_description};
 
 /// Standard FIX message header
 #[derive(Debug, Clone, PartialEq)]
@@ -60,9 +55,21 @@ impl FixHeader {
 
 impl Validate for FixHeader {
 	fn validate(&self) -> Result<(), ValidationError> {
-		utils::validate_non_empty_string("SenderCompID", &self.sender_comp_id)?;
-		utils::validate_non_empty_string("TargetCompID", &self.target_comp_id)?;
-		utils::validate_sequence_number(self.msg_seq_num)?;
+		if self.begin_string != "FIX.4.2" {
+			return Err(ValidationError::VersionMismatch);
+		}
+		if self.sender_comp_id.is_empty() {
+			return Err(ValidationError::EmptyMessage);
+		}
+		if self.target_comp_id.is_empty() {
+			return Err(ValidationError::EmptyMessage);
+		}
+		if self.msg_seq_num == 0 {
+			return Err(ValidationError::EmptyMessage);
+		}
+		if self.sending_time.year() < 1970 {
+			return Err(ValidationError::EmptyMessage);
+		}
 		Ok(())
 	}
 }

@@ -6,7 +6,7 @@
 
 use crate::{
 	FixMessage,
-	common::{EncryptMethod, FixHeader, FixTrailer, MsgType},
+	common::{EncryptMethod, FixHeader, FixTrailer, MsgType, Side},
 	messages::{FixMessageBody, HeartbeatBody, LogonBody},
 };
 use time::OffsetDateTime;
@@ -118,6 +118,76 @@ impl FixMessageBuilder {
 	pub fn max_message_size(mut self, size: u32) -> Self {
 		if let FixMessageBody::Logon(body) = &mut self.message.body {
 			body.max_message_size = Some(size);
+		}
+		self
+	}
+
+	pub fn cl_ord_id(mut self, cl_ord_id: impl Into<String>) -> Self {
+		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
+			body.cl_ord_id = cl_ord_id.into();
+		}
+		self
+	}
+
+	pub fn handl_inst(mut self, handl_inst: impl Into<String>) -> Self {
+		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
+			body.handl_inst = handl_inst.into();
+		}
+		self
+	}
+
+	pub fn symbol(mut self, symbol: impl Into<String>) -> Self {
+		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
+			body.symbol = symbol.into();
+		}
+		self
+	}
+
+	pub fn side(mut self, side: Side) -> Self {
+		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
+			body.side = side;
+		}
+		self
+	}
+
+	pub fn transact_time(mut self, transact_time: OffsetDateTime) -> Self {
+		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
+			body.transact_time = transact_time;
+		}
+		self
+	}
+
+	pub fn ord_type(mut self, ord_type: impl Into<String>) -> Self {
+		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
+			body.ord_type = ord_type.into();
+		}
+		self
+	}
+
+	pub fn order_qty(mut self, order_qty: f64) -> Self {
+		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
+			body.order_qty = Some(order_qty);
+		}
+		self
+	}
+
+	pub fn cash_order_qty(mut self, cash_order_qty: f64) -> Self {
+		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
+			body.cash_order_qty = Some(cash_order_qty);
+		}
+		self
+	}
+
+	pub fn security_exchange(mut self, security_exchange: impl Into<String>) -> Self {
+		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
+			body.security_exchange = Some(security_exchange.into());
+		}
+		self
+	}
+
+	pub fn price(mut self, price: f64) -> Self {
+		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
+			body.price = Some(price);
 		}
 		self
 	}

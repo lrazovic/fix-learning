@@ -18,6 +18,8 @@ pub enum ValidationError {
 	InvalidBodyLength,
 	/// The message is empty or malformed
 	EmptyMessage,
+	/// The FIX version is not supported
+	VersionMismatch,
 	/// A field value is out of acceptable range
 	ValueOutOfRange(String, String),
 	/// A field format is incorrect
@@ -41,6 +43,9 @@ impl Display for ValidationError {
 			},
 			ValidationError::EmptyMessage => {
 				write!(f, "Empty message")
+			},
+			ValidationError::VersionMismatch => {
+				write!(f, "FIX Version Not Supported")
 			},
 			ValidationError::ValueOutOfRange(field, value) => {
 				write!(f, "Value '{}' for field '{}' is out of acceptable range", value, field)
@@ -73,131 +78,5 @@ pub trait Validate {
 	/// - `false` if validation fails
 	fn is_valid(&self) -> bool {
 		self.validate().is_ok()
-	}
-}
-
-/// Validation utilities for common validation patterns
-pub mod utils {
-	use super::ValidationError;
-
-	/// Validate that a string field is not empty
-	pub fn validate_non_empty_string(field_name: &str, value: &str) -> Result<(), ValidationError> {
-		if value.is_empty() { Err(ValidationError::MissingRequiredField(field_name.to_string())) } else { Ok(()) }
-	}
-
-	/// Validate that a numeric value is within range
-	pub fn validate_range<T: PartialOrd + std::fmt::Display>(
-		field_name: &str,
-		value: T,
-		min: T,
-		max: T,
-	) -> Result<(), ValidationError> {
-		if value < min || value > max {
-			Err(ValidationError::ValueOutOfRange(field_name.to_string(), value.to_string()))
-		} else {
-			Ok(())
-		}
-	}
-
-	/// Validate that a numeric value is positive (greater than zero)
-	pub fn validate_positive<T: PartialOrd + std::fmt::Display + Default>(
-		field_name: &str,
-		value: T,
-	) -> Result<(), ValidationError> {
-		if value <= T::default() {
-			Err(ValidationError::InvalidFieldValue(field_name.to_string(), value.to_string()))
-		} else {
-			Ok(())
-		}
-	}
-
-	/// Validate checksum format (3 digits)
-	pub fn validate_checksum_format(checksum: &str) -> Result<(), ValidationError> {
-		if checksum.len() != 3 {
-			return Err(ValidationError::InvalidChecksum);
-		}
-
-		if !checksum.chars().all(|c| c.is_ascii_digit()) {
-			return Err(ValidationError::InvalidChecksum);
-		}
-
-		Ok(())
-	}
-
-	/// Validate that a sequence number is valid (greater than 0)
-	pub fn validate_sequence_number(seq_num: u32) -> Result<(), ValidationError> {
-		if seq_num == 0 {
-			Err(ValidationError::InvalidFieldValue("MsgSeqNum".to_string(), "0".to_string()))
-		} else {
-			Ok(())
-		}
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::{utils::*, *};
-
-	#[test]
-	fn test_validation_error_display() {
-		let error = ValidationError::MissingRequiredField("TestField".to_string());
-		assert_eq!(error.to_string(), "Missing required field: TestField");
-
-		let error = ValidationError::InvalidFieldValue("TestField".to_string(), "InvalidValue".to_string());
-		assert_eq!(error.to_string(), "Invalid value 'InvalidValue' for field 'TestField'");
-	}
-
-	#[test]
-	fn test_validate_non_empty_string() {
-		assert!(validate_non_empty_string("TestField", "valid").is_ok());
-		assert!(validate_non_empty_string("TestField", "").is_err());
-	}
-
-	#[test]
-	fn test_validate_range() {
-		assert!(validate_range("TestField", 5, 1, 10).is_ok());
-		assert!(validate_range("TestField", 0, 1, 10).is_err());
-		assert!(validate_range("TestField", 11, 1, 10).is_err());
-	}
-
-	#[test]
-	fn test_validate_positive() {
-		assert!(validate_positive("TestField", 1u32).is_ok());
-		assert!(validate_positive("TestField", 0u32).is_err());
-	}
-
-	#[test]
-	fn test_validate_checksum_format() {
-		assert!(validate_checksum_format("123").is_ok());
-		assert!(validate_checksum_format("000").is_ok());
-		assert!(validate_checksum_format("12").is_err());
-		assert!(validate_checksum_format("1234").is_err());
-		assert!(validate_checksum_format("12a").is_err());
-	}
-
-	#[test]
-	fn test_validate_sequence_number() {
-		assert!(validate_sequence_number(1).is_ok());
-		assert!(validate_sequence_number(999999).is_ok());
-		assert!(validate_sequence_number(0).is_err());
-	}
-
-	#[test]
-	fn test_is_valid_convenience_method() {
-		struct TestValidator {
-			should_pass: bool,
-		}
-
-		impl Validate for TestValidator {
-			fn validate(&self) -> Result<(), ValidationError> {
-				if self.should_pass { Ok(()) } else { Err(ValidationError::EmptyMessage) }
-			}
-		}
-
-		let valid = TestValidator { should_pass: true };
-		let invalid = TestValidator { should_pass: false };
-
-		assert!(valid.is_valid());
-		assert!(!invalid.is_valid());
 	}
 }

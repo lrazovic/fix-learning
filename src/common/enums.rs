@@ -10,6 +10,10 @@ use crate::macros::fix_enum;
 fix_enum!(Loose MsgType {
 	Heartbeat => "0",
 	Logon => "A",
+	NewOrderSingle => "D",
+	ExecutionReport => "8",
+	OrderCancelRequest => "F",
+	MarketDataRequest => "V",
 });
 
 // Trading side enumeration

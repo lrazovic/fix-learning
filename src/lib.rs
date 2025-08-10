@@ -47,18 +47,14 @@ pub mod macros;
 pub mod messages;
 
 use std::{collections::HashMap, fmt::Display};
-use time::{format_description::BorrowedFormatItem, macros::format_description};
 
 // Re-export commonly used types
 pub use builder::FixMessageBuilder;
 pub use common::{
-	EncryptMethod, FixHeader, FixTrailer, MsgType, OrdStatus, SOH, Side, Validate, ValidationError, parse_fix_timestamp,
+	EncryptMethod, FORMAT_TIME, FixHeader, FixTrailer, MsgType, OrdStatus, SOH, Side, Validate, ValidationError,
+	parse_fix_timestamp,
 };
 pub use messages::{FixMessageBody, HeartbeatBody, LogonBody};
-
-/// Time/date combination format for FIX timestamps
-static FORMAT_TIME: &[BorrowedFormatItem<'_>] =
-	format_description!("[year][month][day]-[hour]:[minute]:[second].[subsecond digits:3]");
 
 /// Main FIX 4.2 Message structure
 ///
@@ -268,6 +264,9 @@ impl FixMessage {
 				if let Some(size_str) = field_map.get("383") {
 					message.body.parse_field(383, size_str).map_err(|e| format!("Parse error: {}", e))?;
 				}
+			},
+			FixMessageBody::NewOrderSingle(_) => {
+				todo!();
 			},
 			FixMessageBody::Other => {
 				// No specific parsing for other message types

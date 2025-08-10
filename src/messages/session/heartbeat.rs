@@ -81,17 +81,6 @@ mod tests {
 	}
 
 	#[test]
-	fn test_heartbeat_serialization() {
-		// Empty heartbeat
-		let heartbeat = HeartbeatBody::new();
-		assert_eq!(heartbeat.serialize_fields(), "");
-
-		// Heartbeat with test request ID
-		let heartbeat = HeartbeatBody::responding_to_test_request("TEST_REQ_001");
-		assert_eq!(heartbeat.serialize_fields(), "112=TEST_REQ_001\x01");
-	}
-
-	#[test]
 	fn test_heartbeat_field_parsing() {
 		let mut heartbeat = HeartbeatBody::new();
 

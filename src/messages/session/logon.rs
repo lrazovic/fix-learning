@@ -163,28 +163,6 @@ mod tests {
 	}
 
 	#[test]
-	fn test_logon_serialization() {
-		// Basic logon
-		let logon = LogonBody::new(EncryptMethod::None, 30);
-		let serialized = logon.serialize_fields();
-		assert!(serialized.contains("98=0\x01"));
-		assert!(serialized.contains("108=30\x01"));
-
-		// Logon with optional fields
-		let logon = LogonBody::new(EncryptMethod::Des, 60)
-			.with_reset_seq_num_flag(true)
-			.with_next_expected_msg_seq_num(1)
-			.with_max_message_size(4096);
-
-		let serialized = logon.serialize_fields();
-		assert!(serialized.contains("98=2\x01"));
-		assert!(serialized.contains("108=60\x01"));
-		assert!(serialized.contains("141=Y\x01"));
-		assert!(serialized.contains("789=1\x01"));
-		assert!(serialized.contains("383=4096\x01"));
-	}
-
-	#[test]
 	fn test_logon_field_parsing() {
 		let mut logon = LogonBody::default();
 

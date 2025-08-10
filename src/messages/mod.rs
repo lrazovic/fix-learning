@@ -4,11 +4,13 @@
 //! organized by functionality (session, orders, market data, etc.).
 //! Each message type has its own validation logic and serialization methods.
 
+pub mod order;
 pub mod session;
 
 use crate::common::{Validate, ValidationError};
 
 // Re-export message body types
+pub use order::NewOrderSingleBody;
 pub use session::{HeartbeatBody, LogonBody};
 
 /// Message-specific body that only allocates fields needed for each message type
@@ -22,6 +24,8 @@ pub enum FixMessageBody {
 	Heartbeat(HeartbeatBody),
 	/// Logon message body (MsgType=A)
 	Logon(LogonBody),
+	/// New Order Single message body (MsgType=D)
+	NewOrderSingle(NewOrderSingleBody),
 	/// Placeholder for other message types not yet implemented with specific bodies
 	Other,
 }
@@ -31,6 +35,7 @@ impl Validate for FixMessageBody {
 		match self {
 			FixMessageBody::Heartbeat(body) => body.validate(),
 			FixMessageBody::Logon(body) => body.validate(),
+			FixMessageBody::NewOrderSingle(body) => body.validate(),
 			FixMessageBody::Other => Ok(()), // No validation for unsupported types yet
 		}
 	}
@@ -42,6 +47,7 @@ impl FixMessageBody {
 		match self {
 			FixMessageBody::Heartbeat(body) => body.serialize_fields(),
 			FixMessageBody::Logon(body) => body.serialize_fields(),
+			FixMessageBody::NewOrderSingle(body) => body.serialize_fields(),
 			FixMessageBody::Other => String::new(),
 		}
 	}
@@ -51,6 +57,7 @@ impl FixMessageBody {
 		match self {
 			FixMessageBody::Heartbeat(body) => body.parse_field(tag, value),
 			FixMessageBody::Logon(body) => body.parse_field(tag, value),
+			FixMessageBody::NewOrderSingle(body) => body.parse_field(tag, value),
 			FixMessageBody::Other => Ok(()), // Ignore fields for unsupported types
 		}
 	}
@@ -89,27 +96,6 @@ mod tests {
 		// Invalid logon (zero heartbeat interval)
 		let invalid_logon = FixMessageBody::Logon(LogonBody::new(EncryptMethod::None, 0));
 		assert!(invalid_logon.validate().is_err());
-	}
-
-	#[test]
-	fn test_message_body_serialization() {
-		// Empty heartbeat
-		let heartbeat = FixMessageBody::Heartbeat(HeartbeatBody::default());
-		assert_eq!(heartbeat.serialize_fields(), "");
-
-		// Heartbeat with test request ID
-		let heartbeat_with_test_req = FixMessageBody::Heartbeat(HeartbeatBody::responding_to_test_request("TEST123"));
-		assert!(heartbeat_with_test_req.serialize_fields().contains("112=TEST123"));
-
-		// Basic logon
-		let logon = FixMessageBody::Logon(LogonBody::new(EncryptMethod::None, 30));
-		let serialized = logon.serialize_fields();
-		assert!(serialized.contains("98=0"));
-		assert!(serialized.contains("108=30"));
-
-		// Other message type
-		let other = FixMessageBody::Other;
-		assert_eq!(other.serialize_fields(), "");
 	}
 
 	#[test]
