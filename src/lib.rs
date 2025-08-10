@@ -145,6 +145,8 @@ impl FixMessage {
 	) -> Self {
 		Self {
 			begin_string: "FIX.4.2",
+			// TODO: Maybe we can have an enum to represent the length: Empty or Size(u32), or just an Option<u32>.
+			// (I don't like that we initialize this to `0` and only after we set the proper length)
 			body_length: Default::default(), // Will be calculated when serializing
 			msg_type,
 			sender_comp_id: sender_comp_id.into(),
@@ -177,6 +179,7 @@ impl FixMessage {
 			exec_ref_id: None,
 			exec_trans_type: None,
 			additional_fields: BTreeMap::new(),
+			// TODO: Same as the `body_length`, probably we can use a better init strategy.
 			checksum: Cow::Borrowed("000"), // Will be calculated when serializing
 		}
 	}
