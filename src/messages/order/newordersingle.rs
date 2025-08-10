@@ -4,12 +4,12 @@
 //! session-level communication to maintain connection liveness and respond
 //! to test requests.
 
-use time::OffsetDateTime;
-
 use crate::{
-	FORMAT_TIME, Side,
+	FORMAT_TIME, SOH, Side,
 	common::{Validate, ValidationError},
 };
+use std::fmt::Write;
+use time::OffsetDateTime;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NewOrderSingleBody {
@@ -63,21 +63,19 @@ impl NewOrderSingleBody {
 	}
 
 	/// Serialize new order single-specific fields to FIX format
-	pub(crate) fn serialize_fields(&self) -> String {
-		let mut result = String::new();
-		result.push_str(&format!("11={}\x01", self.cl_ord_id));
-		result.push_str(&format!("21={}\x01", self.handl_inst));
-		result.push_str(&format!("55={}\x01", self.symbol));
-		result.push_str(&format!("54={}\x01", self.side));
-		result.push_str(&format!("60={}\x01", self.transact_time.format(FORMAT_TIME).unwrap()));
-		result.push_str(&format!("40={}\x01", self.ord_type));
+	pub(crate) fn write_fields(&self, buf: &mut String) {
+		write!(buf, "11={}{}", self.cl_ord_id, SOH).unwrap();
+		write!(buf, "21={}{}", self.handl_inst, SOH).unwrap();
+		write!(buf, "55={}{}", self.symbol, SOH).unwrap();
+		write!(buf, "54={}{}", self.side, SOH).unwrap();
+		write!(buf, "60={}{}", self.transact_time.format(FORMAT_TIME).unwrap(), SOH).unwrap();
+		write!(buf, "40={}{}", self.ord_type, SOH).unwrap();
 		if let Some(security_exchange) = &self.security_exchange {
-			result.push_str(&format!("207={}\x01", security_exchange));
+			write!(buf, "207={}{}", security_exchange, SOH).unwrap();
 		}
 		if let Some(price) = self.price {
-			result.push_str(&format!("44={}\x01", price));
+			write!(buf, "44={}{}", price, SOH).unwrap();
 		}
-		result
 	}
 
 	/// Parse a heartbeat-specific field

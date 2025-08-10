@@ -4,14 +4,15 @@
 //! session-level communication to maintain connection liveness and respond
 //! to test requests.
 
-use crate::common::{Validate, ValidationError};
+use crate::common::{SOH, Validate, ValidationError};
+use std::fmt::Write;
 
 /// Heartbeat message body (Tag 35=0)
 ///
 /// The Heartbeat message is sent periodically to maintain session liveness.
 /// It can also be sent in response to a Test Request message, in which case
 /// it must include the TestReqID from the original Test Request.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct HeartbeatBody {
 	/// Test request ID (Tag 112) - Required when the heartbeat is the result of a Test Request message
 	pub test_req_id: Option<String>,
@@ -36,13 +37,10 @@ impl HeartbeatBody {
 		Self { test_req_id: Some(test_req_id.into()) }
 	}
 
-	/// Serialize heartbeat-specific fields to FIX format
-	pub(crate) fn serialize_fields(&self) -> String {
-		let mut result = String::new();
+	pub(crate) fn write_fields(&self, buf: &mut String) {
 		if let Some(ref test_req_id) = self.test_req_id {
-			result.push_str(&format!("112={}\x01", test_req_id));
+			write!(buf, "112={}{}", test_req_id, SOH).unwrap();
 		}
-		result
 	}
 
 	/// Parse a heartbeat-specific field

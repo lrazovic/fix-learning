@@ -6,7 +6,7 @@
 use std::fmt::Display;
 
 /// Validation error types for FIX messages
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ValidationError {
 	/// A required field is missing from the message
 	MissingRequiredField(String),
@@ -29,28 +29,28 @@ pub enum ValidationError {
 impl Display for ValidationError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			ValidationError::MissingRequiredField(field) => {
+			Self::MissingRequiredField(field) => {
 				write!(f, "Missing required field: {}", field)
 			},
-			ValidationError::InvalidFieldValue(field, value) => {
+			Self::InvalidFieldValue(field, value) => {
 				write!(f, "Invalid value '{}' for field '{}'", value, field)
 			},
-			ValidationError::InvalidChecksum => {
+			Self::InvalidChecksum => {
 				write!(f, "Invalid checksum")
 			},
-			ValidationError::InvalidBodyLength => {
+			Self::InvalidBodyLength => {
 				write!(f, "Invalid body length")
 			},
-			ValidationError::EmptyMessage => {
+			Self::EmptyMessage => {
 				write!(f, "Empty message")
 			},
-			ValidationError::VersionMismatch => {
+			Self::VersionMismatch => {
 				write!(f, "FIX Version Not Supported")
 			},
-			ValidationError::ValueOutOfRange(field, value) => {
+			Self::ValueOutOfRange(field, value) => {
 				write!(f, "Value '{}' for field '{}' is out of acceptable range", value, field)
 			},
-			ValidationError::InvalidFormat(field, value) => {
+			Self::InvalidFormat(field, value) => {
 				write!(f, "Invalid format '{}' for field '{}'", value, field)
 			},
 		}

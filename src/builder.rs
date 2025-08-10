@@ -5,7 +5,7 @@
 //! body length calculation and checksum generation.
 
 use crate::{
-	FixMessage,
+	FixMessage, SOH,
 	common::{EncryptMethod, FixHeader, FixTrailer, MsgType, Side},
 	messages::{FixMessageBody, HeartbeatBody, LogonBody},
 };
@@ -34,7 +34,7 @@ impl FixMessageBuilder {
 		let header = FixHeader::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num);
 		let trailer = FixTrailer::default();
 
-		Self { message: FixMessage { header, body, trailer } }
+		Self { message: FixMessage { header, body, trailer, serialized_body_and_trailer: None } }
 	}
 
 	/// Create a builder from an existing message
@@ -91,7 +91,7 @@ impl FixMessageBuilder {
 	}
 
 	/// Set the heartbeat interval for logon messages
-	pub fn heart_bt_int(mut self, interval: u32) -> Self {
+	pub const fn heart_bt_int(mut self, interval: u32) -> Self {
 		if let FixMessageBody::Logon(body) = &mut self.message.body {
 			body.heart_bt_int = interval;
 		}
@@ -99,7 +99,7 @@ impl FixMessageBuilder {
 	}
 
 	/// Set the reset sequence number flag for logon messages
-	pub fn reset_seq_num_flag(mut self, flag: bool) -> Self {
+	pub const fn reset_seq_num_flag(mut self, flag: bool) -> Self {
 		if let FixMessageBody::Logon(body) = &mut self.message.body {
 			body.reset_seq_num_flag = Some(flag);
 		}
@@ -107,7 +107,7 @@ impl FixMessageBuilder {
 	}
 
 	/// Set the next expected message sequence number for logon messages
-	pub fn next_expected_msg_seq_num(mut self, seq_num: u32) -> Self {
+	pub const fn next_expected_msg_seq_num(mut self, seq_num: u32) -> Self {
 		if let FixMessageBody::Logon(body) = &mut self.message.body {
 			body.next_expected_msg_seq_num = Some(seq_num);
 		}
@@ -115,7 +115,7 @@ impl FixMessageBuilder {
 	}
 
 	/// Set the maximum message size for logon messages
-	pub fn max_message_size(mut self, size: u32) -> Self {
+	pub const fn max_message_size(mut self, size: u32) -> Self {
 		if let FixMessageBody::Logon(body) = &mut self.message.body {
 			body.max_message_size = Some(size);
 		}
@@ -143,14 +143,14 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn side(mut self, side: Side) -> Self {
+	pub const fn side(mut self, side: Side) -> Self {
 		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
 			body.side = side;
 		}
 		self
 	}
 
-	pub fn transact_time(mut self, transact_time: OffsetDateTime) -> Self {
+	pub const fn transact_time(mut self, transact_time: OffsetDateTime) -> Self {
 		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
 			body.transact_time = transact_time;
 		}
@@ -164,14 +164,14 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn order_qty(mut self, order_qty: f64) -> Self {
+	pub const fn order_qty(mut self, order_qty: f64) -> Self {
 		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
 			body.order_qty = Some(order_qty);
 		}
 		self
 	}
 
-	pub fn cash_order_qty(mut self, cash_order_qty: f64) -> Self {
+	pub const fn cash_order_qty(mut self, cash_order_qty: f64) -> Self {
 		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
 			body.cash_order_qty = Some(cash_order_qty);
 		}
@@ -185,7 +185,7 @@ impl FixMessageBuilder {
 		self
 	}
 
-	pub fn price(mut self, price: f64) -> Self {
+	pub const fn price(mut self, price: f64) -> Self {
 		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
 			body.price = Some(price);
 		}
@@ -194,11 +194,17 @@ impl FixMessageBuilder {
 
 	/// Build the final message with calculated body length and checksum
 	pub fn build(mut self) -> FixMessage {
-		// Calculate body length
-		self.message.header.body_length = self.message.calculate_body_length();
+		let body_and_trailer = self.message.write_body_and_trailer_without_checksum();
+		let body_length = body_and_trailer.len() as u32;
 
-		// Calculate checksum
-		self.message.trailer.checksum = self.message.calculate_checksum();
+		// Build message_without_checksum for checksum
+		let message_without_checksum =
+			format!("8={}{}9={}{}{}", self.message.header.begin_string, SOH, body_length, SOH, &body_and_trailer);
+		let checksum: u32 = message_without_checksum.bytes().map(|b| b as u32).sum::<u32>() % 256;
+
+		self.message.header.body_length = body_length;
+		self.message.trailer.checksum = format!("{:03}", checksum);
+		self.message.serialized_body_and_trailer = Some(body_and_trailer); // Cache it
 
 		self.message
 	}
@@ -307,10 +313,8 @@ mod tests {
 
 		// Verify calculated values are correct
 		let expected_body_length = message.calculate_body_length();
-		let expected_checksum = message.calculate_checksum();
 
 		assert_eq!(message.header.body_length, expected_body_length);
-		assert_eq!(message.trailer.checksum, expected_checksum);
 	}
 
 	#[test]

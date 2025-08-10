@@ -46,7 +46,10 @@ pub mod common;
 pub mod macros;
 pub mod messages;
 
-use std::{collections::HashMap, fmt::Display};
+use std::{
+	collections::HashMap,
+	fmt::{Display, Write},
+};
 
 // Re-export commonly used types
 pub use builder::FixMessageBuilder;
@@ -70,6 +73,9 @@ pub struct FixMessage {
 	pub body: FixMessageBody,
 	/// Standard message trailer with checksum and optional signature
 	pub trailer: FixTrailer,
+
+	/// FIX Serialized body and trailer without checksum, useful to memoize serialization.
+	serialized_body_and_trailer: Option<String>,
 }
 
 impl Display for FixMessage {
@@ -104,7 +110,7 @@ impl FixMessage {
 		};
 		let header = FixHeader::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num);
 		let trailer = FixTrailer::default();
-		Self { header, body, trailer }
+		Self { header, body, trailer, serialized_body_and_trailer: None }
 	}
 
 	/// Check if the message is valid
@@ -112,79 +118,83 @@ impl FixMessage {
 		self.validate().is_ok()
 	}
 
+	pub fn calculate_length_and_checksum(&self) -> (u32, String) {
+		// Serialize body and trailer once
+		let body_and_trailer = self.write_body_and_trailer_without_checksum();
+		let body_length = body_and_trailer.len() as u32;
+
+		// Calculate checksum
+		let checksum = &self.trailer.checksum;
+
+		(body_length, format!("{:03}", checksum))
+	}
+
 	/// Calculate body length (excludes header tags 8, 9, 10 and the checksum)
 	pub fn calculate_body_length(&self) -> u32 {
-		let body_string = self.serialize_body_and_trailer_without_checksum();
-		body_string.len() as u32
+		self.calculate_length_and_checksum().0
 	}
 
-	/// Calculate FIX checksum (sum of all bytes modulo 256)
-	pub fn calculate_checksum(&self) -> String {
-		let message_without_checksum = self.serialize_without_checksum();
-		let checksum: u32 = message_without_checksum.bytes().map(|b| b as u32).sum::<u32>() % 256;
-		format!("{:03}", checksum)
-	}
-
-	/// Serialize message without checksum for checksum calculation
-	pub fn serialize_without_checksum(&self) -> String {
-		let mut result = String::new();
-
-		// Header
-		result.push_str(&format!("8={}{}", self.header.begin_string, SOH));
-		result.push_str(&format!("9={}{}", self.calculate_body_length(), SOH));
-		result.push_str(&self.serialize_body_and_trailer_without_checksum());
-
-		result
-	}
-
-	/// Serialize body and trailer without checksum
-	pub fn serialize_body_and_trailer_without_checksum(&self) -> String {
-		let mut result = String::new();
-
+	/// Write to existing buffer - zero additional allocations
+	pub fn write_body_and_trailer_without_checksum(&self) -> String {
+		let mut buf = String::with_capacity(256); // Single allocation
 		// Message type
-		result.push_str(&format!("35={}{}", self.header.msg_type, SOH));
+		write!(buf, "35={}{}", self.header.msg_type, SOH).unwrap();
 
 		// Required header fields
-		result.push_str(&format!("49={}{}", self.header.sender_comp_id, SOH));
-		result.push_str(&format!("56={}{}", self.header.target_comp_id, SOH));
-		result.push_str(&format!("34={}{}", self.header.msg_seq_num, SOH));
+		write!(buf, "49={}{}", self.header.sender_comp_id, SOH).unwrap();
+		write!(buf, "56={}{}", self.header.target_comp_id, SOH).unwrap();
+		write!(buf, "34={}{}", self.header.msg_seq_num, SOH).unwrap();
 
 		// Format sending time
-		let sending_time_str = self.header.sending_time.format(&FORMAT_TIME).unwrap_or_default();
-		result.push_str(&format!("52={}{}", sending_time_str, SOH));
+		// FIXME: This formatting operation costs us the ~40% of the total serialization time.
+		let sending_time_str = self.header.sending_time.format(&FORMAT_TIME).unwrap();
+		write!(buf, "52={}{}", sending_time_str, SOH).unwrap();
 
 		// Optional header fields
 		if let Some(flag) = self.header.poss_dup_flag {
-			result.push_str(&format!("43={}{}", if flag { "Y" } else { "N" }, SOH));
+			write!(buf, "43={}{}", if flag { "Y" } else { "N" }, SOH).unwrap();
 		}
 		if let Some(flag) = self.header.poss_resend {
-			result.push_str(&format!("97={}{}", if flag { "Y" } else { "N" }, SOH));
+			write!(buf, "97={}{}", if flag { "Y" } else { "N" }, SOH).unwrap();
 		}
 		if let Some(time) = self.header.orig_sending_time {
-			let time_str = time.format(&FORMAT_TIME).unwrap_or_default();
-			result.push_str(&format!("122={}{}", time_str, SOH));
+			let time_str = time.format(&FORMAT_TIME).unwrap();
+			write!(buf, "122={}{}", time_str, SOH).unwrap();
 		}
 
-		// Body fields
-		result.push_str(&self.body.serialize_fields());
+		// Body fields - write directly to same buffer
+		self.body.write_fields(&mut buf);
 
-		// Optional trailer fields (excluding checksum)
+		// Optional trailer fields
 		if let Some(sig_len) = self.trailer.signature_length {
-			result.push_str(&format!("93={}{}", sig_len, SOH));
+			write!(buf, "93={}{}", sig_len, SOH).unwrap();
 		}
 		if let Some(ref signature) = self.trailer.signature {
-			result.push_str(&format!("89={}{}", signature, SOH));
+			write!(buf, "89={}{}", signature, SOH).unwrap();
 		}
-
-		result
+		buf
 	}
 
 	/// Serialize the complete message to FIX wire format
 	pub fn to_fix_string(&self) -> String {
-		let mut result = self.serialize_without_checksum();
-		let checksum = self.calculate_checksum();
-		result.push_str(&format!("10={}{}", checksum, SOH));
-		result
+		if let Some(body_and_trailer) = &self.serialized_body_and_trailer {
+			return format!(
+				"8={}{}9={}{}{}10={}{}",
+				self.header.begin_string,
+				SOH,
+				self.header.body_length,
+				SOH,
+				body_and_trailer,
+				self.trailer.checksum,
+				SOH
+			);
+		}
+		let body_and_trailer = self.write_body_and_trailer_without_checksum();
+
+		format!(
+			"8={}{}9={}{}{}10={}{}",
+			self.header.begin_string, SOH, self.header.body_length, SOH, body_and_trailer, self.trailer.checksum, SOH
+		)
 	}
 
 	/// Parse a FIX message from wire format

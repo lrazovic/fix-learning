@@ -6,7 +6,7 @@
 use crate::common::validation::{Validate, ValidationError};
 
 /// Standard FIX message trailer
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct FixTrailer {
 	// Required Trailer Fields
 	pub checksum: String, // Tag 10 - Checksum of the message, always unencrypted, always last field in message.

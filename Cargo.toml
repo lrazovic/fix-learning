@@ -12,3 +12,6 @@ criterion = { version = "0.7", features = ["html_reports"] }
 [[bench]]
 name = "fix_benchmarks"
 harness = false
+
+[profile.bench]
+debug = true

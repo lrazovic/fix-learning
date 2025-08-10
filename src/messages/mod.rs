@@ -33,32 +33,32 @@ pub enum FixMessageBody {
 impl Validate for FixMessageBody {
 	fn validate(&self) -> Result<(), ValidationError> {
 		match self {
-			FixMessageBody::Heartbeat(body) => body.validate(),
-			FixMessageBody::Logon(body) => body.validate(),
-			FixMessageBody::NewOrderSingle(body) => body.validate(),
-			FixMessageBody::Other => Ok(()), // No validation for unsupported types yet
+			Self::Heartbeat(body) => body.validate(),
+			Self::Logon(body) => body.validate(),
+			Self::NewOrderSingle(body) => body.validate(),
+			Self::Other => Ok(()), // No validation for unsupported types yet
 		}
 	}
 }
 
 impl FixMessageBody {
 	/// Serialize the message body fields to FIX format
-	pub(crate) fn serialize_fields(&self) -> String {
+	pub(crate) fn write_fields(&self, buf: &mut String) {
 		match self {
-			FixMessageBody::Heartbeat(body) => body.serialize_fields(),
-			FixMessageBody::Logon(body) => body.serialize_fields(),
-			FixMessageBody::NewOrderSingle(body) => body.serialize_fields(),
-			FixMessageBody::Other => String::new(),
+			Self::Heartbeat(body) => body.write_fields(buf),
+			Self::Logon(body) => body.write_fields(buf),
+			Self::NewOrderSingle(body) => body.write_fields(buf),
+			Self::Other => {}, // Nothing to write
 		}
 	}
 
 	/// Parse a field into the appropriate message body
 	pub(crate) fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
 		match self {
-			FixMessageBody::Heartbeat(body) => body.parse_field(tag, value),
-			FixMessageBody::Logon(body) => body.parse_field(tag, value),
-			FixMessageBody::NewOrderSingle(body) => body.parse_field(tag, value),
-			FixMessageBody::Other => Ok(()), // Ignore fields for unsupported types
+			Self::Heartbeat(body) => body.parse_field(tag, value),
+			Self::Logon(body) => body.parse_field(tag, value),
+			Self::NewOrderSingle(body) => body.parse_field(tag, value),
+			Self::Other => Ok(()), // Ignore fields for unsupported types
 		}
 	}
 }

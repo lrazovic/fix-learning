@@ -19,5 +19,5 @@ pub use validation::{Validate, ValidationError};
 pub const SOH: &str = "\x01";
 
 /// Time/date combination format for FIX timestamps
-pub static FORMAT_TIME: &[BorrowedFormatItem<'_>] =
+pub const FORMAT_TIME: &[BorrowedFormatItem<'_>] =
 	format_description!("[year][month][day]-[hour]:[minute]:[second].[subsecond digits:3]");

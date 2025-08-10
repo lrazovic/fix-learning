@@ -13,7 +13,7 @@ use crate::{
 use time::{Duration, OffsetDateTime, PrimitiveDateTime, UtcOffset, macros::format_description};
 
 /// Standard FIX message header
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct FixHeader {
 	// Required Header Fields
 	pub begin_string: &'static str,   // Tag 8 - Always "FIX.4.2"

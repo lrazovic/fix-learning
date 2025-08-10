@@ -4,13 +4,14 @@
 //! initiate a FIX session between two counterparties. The Logon message
 //! establishes session parameters and authentication.
 
-use crate::common::{EncryptMethod, Validate, ValidationError};
+use crate::common::{EncryptMethod, SOH, Validate, ValidationError};
+use std::fmt::Write;
 
 /// Logon message body (Tag 35=A)
 ///
 /// The Logon message is the first message sent to initiate a FIX session.
 /// It contains session parameters including encryption method and heartbeat interval.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LogonBody {
 	/// Encryption method (Tag 98) - Required
 	pub encrypt_method: EncryptMethod,
@@ -52,41 +53,37 @@ impl LogonBody {
 	}
 
 	/// Set the reset sequence number flag
-	pub fn with_reset_seq_num_flag(mut self, flag: bool) -> Self {
+	pub const fn with_reset_seq_num_flag(mut self, flag: bool) -> Self {
 		self.reset_seq_num_flag = Some(flag);
 		self
 	}
 
 	/// Set the next expected message sequence number
-	pub fn with_next_expected_msg_seq_num(mut self, seq_num: u32) -> Self {
+	pub const fn with_next_expected_msg_seq_num(mut self, seq_num: u32) -> Self {
 		self.next_expected_msg_seq_num = Some(seq_num);
 		self
 	}
 
 	/// Set the maximum message size
-	pub fn with_max_message_size(mut self, size: u32) -> Self {
+	pub const fn with_max_message_size(mut self, size: u32) -> Self {
 		self.max_message_size = Some(size);
 		self
 	}
 
 	/// Serialize logon-specific fields to FIX format
-	pub(crate) fn serialize_fields(&self) -> String {
-		let mut result = String::new();
-
-		result.push_str(&format!("98={}\x01", self.encrypt_method));
-		result.push_str(&format!("108={}\x01", self.heart_bt_int));
+	pub(crate) fn write_fields(&self, buf: &mut String) {
+		write!(buf, "98={}{}", self.encrypt_method, SOH).unwrap();
+		write!(buf, "108={}{}", self.heart_bt_int, SOH).unwrap();
 
 		if let Some(flag) = self.reset_seq_num_flag {
-			result.push_str(&format!("141={}\x01", if flag { "Y" } else { "N" }));
+			write!(buf, "141={}{}", if flag { "Y" } else { "N" }, SOH).unwrap();
 		}
 		if let Some(seq_num) = self.next_expected_msg_seq_num {
-			result.push_str(&format!("789={}\x01", seq_num));
+			write!(buf, "789={}{}", seq_num, SOH).unwrap();
 		}
-		if let Some(max_size) = self.max_message_size {
-			result.push_str(&format!("383={}\x01", max_size));
+		if let Some(size) = self.max_message_size {
+			write!(buf, "383={}{}", size, SOH).unwrap();
 		}
-
-		result
 	}
 
 	/// Parse a logon-specific field
