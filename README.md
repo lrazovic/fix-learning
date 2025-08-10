@@ -121,19 +121,6 @@ let user_message = FixMessage::builder(
 .build();
 ```
 
-### Creating a Basic Message (Alternative Method)
-
-```rust
-use fix_learning::{FixMessage, MsgType};
-
-let heartbeat = FixMessage::new(
-    MsgType::Heartbeat,
-    "CLIENT",
-    "BROKER",
-    1,
-);
-// sending_time is automatically set to OffsetDateTime::now_utc()
-```
 
 ### Working with Custom Fields
 

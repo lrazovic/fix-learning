@@ -42,15 +42,14 @@ fn main() {
 	println!("{}\n", fix_wire);
 
 	// Show in readable format
-	let readable = fix_wire.replace('\x01', " | ");
 	println!("Built FIX message (readable):");
-	println!("{}\n", readable);
+	println!("{}\n", user_message);
 
 	// Demonstrate field breakdown
 	println!("=== Field Breakdown ===");
 	println!("8=FIX.4.2                    - BeginString (FIX version)");
 	println!(
-		"9={}                         - BodyLength (calculated automatically)",
+		"9={}                        - BodyLength (calculated automatically)",
 		fix_wire.split('\x01').find(|s| s.starts_with("9=")).unwrap_or("9=?").split('=').nth(1).unwrap_or("?")
 	);
 	println!("35=D                         - MsgType (NewOrderSingle)");
@@ -68,7 +67,7 @@ fn main() {
 	println!("207=TO                       - SecurityExchange");
 	println!("6000=TEST1234                - Custom Field");
 	println!(
-		"10={}                        - CheckSum (calculated automatically)",
+		"10={}                          - CheckSum (calculated automatically)",
 		fix_wire.split('\x01').last().unwrap_or("10=?")
 	);
 

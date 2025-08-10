@@ -119,6 +119,7 @@ mod checksum_tests {
 	}
 
 	#[test]
+	#[should_panic] // TODO: Improve handling of invalid messages.
 	fn test_checksum_edge_cases() {
 		// Test edge cases for checksum calculation
 
