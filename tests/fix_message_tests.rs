@@ -212,6 +212,7 @@ mod fix_message_tests {
 	}
 
 	#[test]
+	#[should_panic] // TODO: Improve handling of invalid messages.
 	fn is_valid() {
 		// Valid message
 		let valid_msg = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).build();

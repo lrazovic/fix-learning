@@ -5,7 +5,7 @@
 
 pub mod macros;
 
-use std::{borrow::Cow, collections::BTreeMap, str::FromStr};
+use std::{borrow::Cow, collections::BTreeMap, fmt::Display, str::FromStr};
 use time::{
 	Duration, OffsetDateTime, PrimitiveDateTime, UtcOffset, format_description::BorrowedFormatItem,
 	macros::format_description,
@@ -125,6 +125,14 @@ pub struct FixMessage {
 
 	// Trailer
 	pub checksum: Cow<'static, str>, // Tag 10 - Checksum
+}
+
+impl Display for FixMessage {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let fix_string = self.to_fix_string();
+		let readable = fix_string.replace(SOH, " | ");
+		write!(f, "{}", readable)
+	}
 }
 
 impl FixMessage {
@@ -369,7 +377,7 @@ impl FixMessageBuilder {
 
 	/// Build the final message
 	pub fn build(self) -> FixMessage {
-		self.message
+		if self.message.is_valid() { self.message } else { panic!("Invalid message: {}", self.message) }
 	}
 }
 
