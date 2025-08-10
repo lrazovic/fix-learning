@@ -123,13 +123,13 @@ mod checksum_tests {
 		// Test edge cases for checksum calculation
 
 		// Empty optional fields
-		let minimal_message = FixMessage::new(MsgType::Heartbeat, "", "", 0);
+		let minimal_message = FixMessage::builder(MsgType::Heartbeat, "", "", 0).build();
 		let fix_string = minimal_message.to_fix_string();
 		let checksum_part = fix_string.split("10=").nth(1).unwrap().trim_end_matches('\x01');
 		assert_eq!(checksum_part.len(), 3);
 
 		// Maximum sequence number
-		let max_seq_message = FixMessage::new(MsgType::Heartbeat, "SENDER", "TARGET", u32::MAX);
+		let max_seq_message = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", u32::MAX).build();
 		let fix_string = max_seq_message.to_fix_string();
 		let checksum_part = fix_string.split("10=").nth(1).unwrap().trim_end_matches('\x01');
 		assert_eq!(checksum_part.len(), 3);

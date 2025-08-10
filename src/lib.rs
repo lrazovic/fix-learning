@@ -113,7 +113,7 @@ pub struct FixMessage {
 
 impl FixMessage {
 	// Create a new FIX message with required fields
-	pub fn new(
+	fn new(
 		msg_type: MsgType,
 		sender_comp_id: impl Into<String>,
 		target_comp_id: impl Into<String>,
@@ -508,6 +508,7 @@ impl FixMessage {
 			return Err("Empty FIX message".to_string());
 		}
 
+		// TODO: Restrict the Default impl to cfg(test) and find a better way to construct an empty `FixMessage`.
 		let mut message = Self::default();
 
 		for field in fields {
