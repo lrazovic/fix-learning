@@ -13,7 +13,7 @@ mod trading_workflow_tests {
 	#[test]
 	fn complete_order_lifecycle() {
 		// 1. Client sends New Order Single
-		let mut new_order = FixMessage::new(MsgType::NewOrderSingle, "CLIENT_TRADER", "PRIME_BROKER", 1);
+		let mut new_order = FixMessage::builder(MsgType::NewOrderSingle, "CLIENT_TRADER", "PRIME_BROKER", 1).build();
 
 		new_order.cl_ord_id = Some("CLIENT_ORD_001".to_string());
 		new_order.symbol = Some("AAPL".to_string());
@@ -27,7 +27,7 @@ mod trading_workflow_tests {
 		assert_eq!(new_order.msg_type, MsgType::NewOrderSingle);
 
 		// 2. Broker responds with Execution Report (New)
-		let mut exec_new = FixMessage::new(MsgType::ExecutionReport, "PRIME_BROKER", "CLIENT_TRADER", 1);
+		let mut exec_new = FixMessage::builder(MsgType::ExecutionReport, "PRIME_BROKER", "CLIENT_TRADER", 1).build();
 
 		exec_new.cl_ord_id = Some("CLIENT_ORD_001".to_string());
 		exec_new.order_id = Some("BROKER_ORD_12345".to_string());
@@ -45,7 +45,8 @@ mod trading_workflow_tests {
 		assert_eq!(exec_new.leaves_qty, Some(1000.0));
 
 		// 3. Partial fill occurs
-		let mut exec_partial = FixMessage::new(MsgType::ExecutionReport, "PRIME_BROKER", "CLIENT_TRADER", 2);
+		let mut exec_partial =
+			FixMessage::builder(MsgType::ExecutionReport, "PRIME_BROKER", "CLIENT_TRADER", 2).build();
 
 		exec_partial.cl_ord_id = Some("CLIENT_ORD_001".to_string());
 		exec_partial.order_id = Some("BROKER_ORD_12345".to_string());
@@ -66,7 +67,7 @@ mod trading_workflow_tests {
 		assert_eq!(exec_partial.leaves_qty, Some(600.0));
 
 		// 4. Final fill completes the order
-		let mut exec_filled = FixMessage::new(MsgType::ExecutionReport, "PRIME_BROKER", "CLIENT_TRADER", 3);
+		let mut exec_filled = FixMessage::builder(MsgType::ExecutionReport, "PRIME_BROKER", "CLIENT_TRADER", 3).build();
 
 		exec_filled.cl_ord_id = Some("CLIENT_ORD_001".to_string());
 		exec_filled.order_id = Some("BROKER_ORD_12345".to_string());
@@ -90,7 +91,7 @@ mod trading_workflow_tests {
 	#[test]
 	fn order_cancel_workflow() {
 		// 1. Original order
-		let mut original_order = FixMessage::new(MsgType::NewOrderSingle, "HEDGE_FUND", "ECN_BROKER", 10);
+		let mut original_order = FixMessage::builder(MsgType::NewOrderSingle, "HEDGE_FUND", "ECN_BROKER", 10).build();
 
 		original_order.cl_ord_id = Some("HF_ORDER_500".to_string());
 		original_order.symbol = Some("TSLA".to_string());
@@ -100,7 +101,7 @@ mod trading_workflow_tests {
 		original_order.price = Some(245.75);
 
 		// 2. Order acknowledged
-		let mut ack_report = FixMessage::new(MsgType::ExecutionReport, "ECN_BROKER", "HEDGE_FUND", 10);
+		let mut ack_report = FixMessage::builder(MsgType::ExecutionReport, "ECN_BROKER", "HEDGE_FUND", 10).build();
 
 		ack_report.cl_ord_id = Some("HF_ORDER_500".to_string());
 		ack_report.order_id = Some("ECN_12345".to_string());
@@ -111,7 +112,8 @@ mod trading_workflow_tests {
 		ack_report.cum_qty = Some(0.0);
 
 		// 3. Client decides to cancel
-		let mut cancel_request = FixMessage::new(MsgType::OrderCancelRequest, "HEDGE_FUND", "ECN_BROKER", 11);
+		let mut cancel_request =
+			FixMessage::builder(MsgType::OrderCancelRequest, "HEDGE_FUND", "ECN_BROKER", 11).build();
 
 		cancel_request.cl_ord_id = Some("HF_ORDER_500".to_string());
 		cancel_request.order_id = Some("ECN_12345".to_string());
@@ -120,7 +122,7 @@ mod trading_workflow_tests {
 		cancel_request.order_qty = Some(2000.0);
 
 		// 4. Broker confirms cancellation
-		let mut cancel_report = FixMessage::new(MsgType::ExecutionReport, "ECN_BROKER", "HEDGE_FUND", 11);
+		let mut cancel_report = FixMessage::builder(MsgType::ExecutionReport, "ECN_BROKER", "HEDGE_FUND", 11).build();
 
 		cancel_report.cl_ord_id = Some("HF_ORDER_500".to_string());
 		cancel_report.order_id = Some("ECN_12345".to_string());
@@ -144,7 +146,8 @@ mod trading_workflow_tests {
 		let new_cl_ord_id = "PROP_TRADE_100_R1";
 
 		// 2. Order replace request
-		let mut replace_request = FixMessage::new(MsgType::OrderCancelReplaceRequest, "PROP_DESK", "DARK_POOL", 25);
+		let mut replace_request =
+			FixMessage::builder(MsgType::OrderCancelReplaceRequest, "PROP_DESK", "DARK_POOL", 25).build();
 
 		replace_request.cl_ord_id = Some(new_cl_ord_id.to_string());
 		replace_request.order_id = Some("DARK_567890".to_string());
@@ -157,7 +160,7 @@ mod trading_workflow_tests {
 		replace_request.set_field(41, original_cl_ord_id.to_string()); // OrigClOrdID
 
 		// 3. Replace confirmation
-		let mut replace_report = FixMessage::new(MsgType::ExecutionReport, "DARK_POOL", "PROP_DESK", 25);
+		let mut replace_report = FixMessage::builder(MsgType::ExecutionReport, "DARK_POOL", "PROP_DESK", 25).build();
 
 		replace_report.cl_ord_id = Some(new_cl_ord_id.to_string());
 		replace_report.order_id = Some("DARK_567890".to_string());
@@ -182,22 +185,24 @@ mod trading_workflow_tests {
 		let mut sequence_num = 100;
 
 		// Heartbeat from client to server
-		let client_heartbeat = FixMessage::new(
+		let client_heartbeat = FixMessage::builder(
 			MsgType::Heartbeat,
 			"CLIENT_SYSTEM".to_string(),
 			"MARKET_DATA_PROVIDER".to_string(),
 			sequence_num,
-		);
+		)
+		.build();
 
 		sequence_num += 1;
 
 		// Heartbeat response from server
-		let server_heartbeat = FixMessage::new(
+		let server_heartbeat = FixMessage::builder(
 			MsgType::Heartbeat,
 			"MARKET_DATA_PROVIDER".to_string(),
 			"CLIENT_SYSTEM".to_string(),
 			sequence_num,
-		);
+		)
+		.build();
 
 		assert_eq!(client_heartbeat.msg_type, MsgType::Heartbeat);
 		assert_eq!(server_heartbeat.msg_type, MsgType::Heartbeat);
@@ -208,12 +213,13 @@ mod trading_workflow_tests {
 	#[test]
 	fn market_data_request_workflow() {
 		// Market data subscription request
-		let mut md_request = FixMessage::new(
+		let mut md_request = FixMessage::builder(
 			MsgType::MarketDataRequest,
 			"TRADING_ENGINE".to_string(),
 			"MARKET_DATA_SERVICE".to_string(),
 			50,
-		);
+		)
+		.build();
 
 		md_request.symbol = Some("SPY".to_string());
 		md_request.set_field(262, "SPY_L1_FEED".to_string()); // MDReqID
@@ -221,7 +227,8 @@ mod trading_workflow_tests {
 		md_request.set_field(264, "1".to_string()); // MarketDepth (Top of book)
 
 		// Market data snapshot response
-		let mut md_snapshot = FixMessage::new(MsgType::MarketDataSnapshot, "MARKET_DATA_SERVICE", "TRADING_ENGINE", 50);
+		let mut md_snapshot =
+			FixMessage::builder(MsgType::MarketDataSnapshot, "MARKET_DATA_SERVICE", "TRADING_ENGINE", 50).build();
 
 		md_snapshot.symbol = Some("SPY".to_string());
 		md_snapshot.set_field(262, "SPY_L1_FEED".to_string()); // MDReqID
@@ -239,7 +246,7 @@ mod trading_workflow_tests {
 	#[test]
 	fn reject_message() {
 		// Invalid order that gets rejected
-		let mut reject_msg = FixMessage::new(MsgType::Reject, "EXCHANGE", "BAD_CLIENT", 999);
+		let mut reject_msg = FixMessage::builder(MsgType::Reject, "EXCHANGE", "BAD_CLIENT", 999).build();
 
 		reject_msg.text = Some("Invalid symbol: INVALID_SYM".to_string());
 		reject_msg.set_field(45, "1000".to_string()); // RefSeqNum - sequence number being rejected
@@ -256,14 +263,15 @@ mod trading_workflow_tests {
 	fn security_definition_workflow() {
 		// Security definition request
 		let mut sec_def_request =
-			FixMessage::new(MsgType::SecurityDefinitionRequest, "RISK_SYSTEM", "REFERENCE_DATA", 200);
+			FixMessage::builder(MsgType::SecurityDefinitionRequest, "RISK_SYSTEM", "REFERENCE_DATA", 200).build();
 
 		sec_def_request.symbol = Some("MSFT".to_string());
 		sec_def_request.set_field(320, "SEC_DEF_REQ_001".to_string()); // SecurityReqID
 		sec_def_request.set_field(321, "1".to_string()); // SecurityRequestType
 
 		// Security definition response
-		let mut sec_def_response = FixMessage::new(MsgType::SecurityDefinition, "REFERENCE_DATA", "RISK_SYSTEM", 200);
+		let mut sec_def_response =
+			FixMessage::builder(MsgType::SecurityDefinition, "REFERENCE_DATA", "RISK_SYSTEM", 200).build();
 
 		sec_def_response.symbol = Some("MSFT".to_string());
 		sec_def_response.security_type = Some("CS".to_string()); // Common Stock

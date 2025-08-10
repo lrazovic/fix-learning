@@ -149,7 +149,7 @@ mod fix_message_tests {
 
 	#[test]
 	fn new_fix_message_creation() {
-		let msg = FixMessage::new(MsgType::Heartbeat, "SENDER".to_string(), "TARGET".to_string(), 123);
+		let msg = FixMessage::builder(MsgType::Heartbeat, "SENDER".to_string(), "TARGET".to_string(), 123).build();
 
 		assert_eq!(msg.begin_string, "FIX.4.2");
 		assert_eq!(msg.msg_type, MsgType::Heartbeat);
@@ -174,7 +174,7 @@ mod fix_message_tests {
 
 	#[test]
 	fn fix_message_optional_fields() {
-		let mut msg = FixMessage::new(MsgType::NewOrderSingle, "CLIENT", "BROKER", 1);
+		let mut msg = FixMessage::builder(MsgType::NewOrderSingle, "CLIENT", "BROKER", 1).build();
 
 		// Initially, optional fields should be None
 		assert_eq!(msg.cl_ord_id, None);
@@ -214,25 +214,27 @@ mod fix_message_tests {
 	#[test]
 	fn is_valid() {
 		// Valid message
-		let valid_msg = FixMessage::new(MsgType::Heartbeat, "SENDER", "TARGET", 1);
+		let valid_msg = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).build();
 		assert!(valid_msg.is_valid());
 
 		// Invalid message - empty sender
-		let invalid_msg = FixMessage::new(
+		let invalid_msg = FixMessage::builder(
 			MsgType::Heartbeat,
 			"", // Empty sender
 			"TARGET",
 			1,
-		);
+		)
+		.build();
 		assert!(!invalid_msg.is_valid());
 
 		// Invalid message - empty target
-		let invalid_msg2 = FixMessage::new(
+		let invalid_msg2 = FixMessage::builder(
 			MsgType::Heartbeat,
 			"SENDER",
 			"", // Empty target
 			1,
-		);
+		)
+		.build();
 		assert!(!invalid_msg2.is_valid());
 	}
 
@@ -242,12 +244,13 @@ mod fix_message_tests {
 		let msg1 = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).sending_time(now).build();
 		let msg2 = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).sending_time(now).build();
 
-		let msg3 = FixMessage::new(
+		let msg3 = FixMessage::builder(
 			MsgType::TestRequest, // Different message type
 			"SENDER",
 			"TARGET",
 			1,
-		);
+		)
+		.build();
 
 		assert_eq!(msg1, msg2);
 		assert_ne!(msg1, msg3);
@@ -272,7 +275,7 @@ mod integration_tests {
 	#[test]
 	fn new_order_single_workflow() {
 		// Create a New Order Single message
-		let mut new_order = FixMessage::new(MsgType::NewOrderSingle, "CLIENT", "BROKER", 1);
+		let mut new_order = FixMessage::builder(MsgType::NewOrderSingle, "CLIENT", "BROKER", 1).build();
 
 		// Set order fields
 		new_order.cl_ord_id = Some("ORDER123".to_string());
@@ -293,7 +296,7 @@ mod integration_tests {
 	#[test]
 	fn execution_report_workflow() {
 		// Create an Execution Report in response to the order
-		let mut exec_report = FixMessage::new(MsgType::ExecutionReport, "BROKER", "CLIENT", 1);
+		let mut exec_report = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 1).build();
 
 		// Set execution fields
 		exec_report.cl_ord_id = Some("ORDER123".to_string());
@@ -315,7 +318,7 @@ mod integration_tests {
 	#[test]
 	fn fill_execution_report() {
 		// Create a fill execution report
-		let mut fill_report = FixMessage::new(MsgType::ExecutionReport, "BROKER", "CLIENT", 2);
+		let mut fill_report = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 2).build();
 
 		fill_report.cl_ord_id = Some("ORDER123".to_string());
 		fill_report.order_id = Some("BROKER123".to_string());
@@ -339,7 +342,7 @@ mod integration_tests {
 
 	#[test]
 	fn heartbeat_message() {
-		let heartbeat = FixMessage::new(MsgType::Heartbeat, "CLIENT", "BROKER", 10);
+		let heartbeat = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "BROKER", 10).build();
 
 		assert!(heartbeat.is_valid());
 		assert_eq!(heartbeat.msg_type, MsgType::Heartbeat);
