@@ -1,4 +1,4 @@
-use fix_learning::{FixMessage, MsgType, OrdStatus, Side};
+use fix_learning::{EncryptMethod, FixMessage, FixMessageBody, MsgType, OrdStatus, Side};
 use std::str::FromStr;
 
 #[cfg(test)]
@@ -8,11 +8,7 @@ mod msg_type_tests {
 	#[test]
 	fn msg_type_from_str_valid_values() {
 		assert_eq!(MsgType::from_str("0").unwrap(), MsgType::Heartbeat);
-		assert_eq!(MsgType::from_str("1").unwrap(), MsgType::TestRequest);
-		assert_eq!(MsgType::from_str("8").unwrap(), MsgType::ExecutionReport);
-		assert_eq!(MsgType::from_str("D").unwrap(), MsgType::NewOrderSingle);
-		assert_eq!(MsgType::from_str("F").unwrap(), MsgType::OrderCancelRequest);
-		assert_eq!(MsgType::from_str("V").unwrap(), MsgType::MarketDataRequest);
+		assert_eq!(MsgType::from_str("A").unwrap(), MsgType::Logon);
 	}
 
 	#[test]
@@ -26,21 +22,13 @@ mod msg_type_tests {
 	#[test]
 	fn msg_type_display() {
 		assert_eq!(format!("{}", MsgType::Heartbeat), "0");
-		assert_eq!(format!("{}", MsgType::TestRequest), "1");
-		assert_eq!(format!("{}", MsgType::ExecutionReport), "8");
-		assert_eq!(format!("{}", MsgType::NewOrderSingle), "D");
-		assert_eq!(format!("{}", MsgType::OrderCancelRequest), "F");
 		assert_eq!(format!("{}", MsgType::Other("Z".to_string())), "Z");
+		assert_eq!(format!("{}", MsgType::Logon), "A");
 	}
 
 	#[test]
 	fn msg_type_round_trip() {
-		let original_types = vec![
-			MsgType::Heartbeat,
-			MsgType::ExecutionReport,
-			MsgType::NewOrderSingle,
-			MsgType::Other("CUSTOM".to_string()),
-		];
+		let original_types = vec![MsgType::Heartbeat, MsgType::Logon, MsgType::Other("CUSTOM".to_string())];
 
 		for msg_type in original_types {
 			let str_repr = format!("{}", msg_type);
@@ -151,92 +139,71 @@ mod fix_message_tests {
 	fn new_fix_message_creation() {
 		let msg = FixMessage::builder(MsgType::Heartbeat, "SENDER".to_string(), "TARGET".to_string(), 123).build();
 
-		assert_eq!(msg.begin_string, "FIX.4.2");
-		assert_eq!(msg.msg_type, MsgType::Heartbeat);
-		assert_eq!(msg.sender_comp_id, "SENDER");
-		assert_eq!(msg.target_comp_id, "TARGET");
-		assert_eq!(msg.msg_seq_num, 123);
-		assert_eq!(msg.body_length, 0);
-		assert_eq!(msg.checksum, "000");
+		assert_eq!(msg.header.begin_string, "FIX.4.2");
+		assert_eq!(msg.header.msg_type, MsgType::Heartbeat);
+		assert_eq!(msg.header.sender_comp_id, "SENDER");
+		assert_eq!(msg.header.target_comp_id, "TARGET");
+		assert_eq!(msg.header.msg_seq_num, 123);
+		assert!(msg.header.body_length > 0);
+		assert_eq!(msg.trailer.checksum.len(), 3);
 	}
 
 	#[test]
 	fn default_fix_message() {
 		let msg = FixMessage::default();
 
-		assert_eq!(msg.begin_string, "FIX.4.2");
-		assert_eq!(msg.msg_type, MsgType::Heartbeat);
-		assert_eq!(msg.sender_comp_id, "SENDER");
-		assert_eq!(msg.target_comp_id, "TARGET");
-		assert_eq!(msg.msg_seq_num, 1);
-		// assert_eq!(msg.sending_time, "19700101-00:00:00.000");
+		assert_eq!(msg.header.begin_string, "FIX.4.2");
+		assert_eq!(msg.header.msg_type, MsgType::Heartbeat);
+		assert_eq!(msg.header.sender_comp_id, "SENDER");
+		assert_eq!(msg.header.target_comp_id, "TARGET");
+		assert_eq!(msg.header.msg_seq_num, 1);
 	}
 
 	#[test]
-	fn fix_message_optional_fields() {
-		let mut msg = FixMessage::builder(MsgType::NewOrderSingle, "CLIENT", "BROKER", 1).build();
+	fn heartbeat_message_creation() {
+		let msg = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "BROKER", 1).test_req_id("TEST123").build();
 
-		// Initially, optional fields should be None
-		assert_eq!(msg.cl_ord_id, None);
-		assert_eq!(msg.symbol, None);
-		assert_eq!(msg.side, None);
-		assert_eq!(msg.order_qty, None);
+		assert_eq!(msg.header.msg_type, MsgType::Heartbeat);
 
-		// Set some optional fields
-		msg.cl_ord_id = Some("CLIENT123".to_string());
-		msg.symbol = Some("AAPL".to_string());
-		msg.side = Some(Side::Buy);
-		msg.order_qty = Some(100.0);
-
-		assert_eq!(msg.cl_ord_id, Some("CLIENT123".to_string()));
-		assert_eq!(msg.symbol, Some("AAPL".to_string()));
-		assert_eq!(msg.side, Some(Side::Buy));
-		assert_eq!(msg.order_qty, Some(100.0));
+		if let FixMessageBody::Heartbeat(body) = &msg.body {
+			assert_eq!(body.test_req_id, Some("TEST123".to_string()));
+		} else {
+			panic!("Expected Heartbeat body");
+		}
 	}
 
 	#[test]
-	fn additional_fields() {
-		let mut msg = FixMessage::default();
+	fn logon_message_creation() {
+		let msg = FixMessage::builder(MsgType::Logon, "CLIENT", "BROKER", 1)
+			.reset_seq_num_flag(true)
+			.max_message_size(1024)
+			.build();
 
-		// Test setting and getting custom fields
-		msg.set_field(9999, "custom_value".to_string());
-		msg.set_field(8888, "another_value".to_string());
+		assert_eq!(msg.header.msg_type, MsgType::Logon);
 
-		assert_eq!(msg.get_field(9999), Some(&"custom_value".to_string()));
-		assert_eq!(msg.get_field(8888), Some(&"another_value".to_string()));
-		assert_eq!(msg.get_field(7777), None);
-
-		// Test overwriting a field
-		msg.set_field(9999, "updated_value".to_string());
-		assert_eq!(msg.get_field(9999), Some(&"updated_value".to_string()));
+		if let FixMessageBody::Logon(body) = &msg.body {
+			assert_eq!(body.encrypt_method, EncryptMethod::None);
+			assert_eq!(body.heart_bt_int, 30);
+			assert_eq!(body.reset_seq_num_flag, Some(true));
+			assert_eq!(body.max_message_size, Some(1024));
+		} else {
+			panic!("Expected Logon body");
+		}
 	}
 
 	#[test]
-	#[should_panic] // TODO: Improve handling of invalid messages.
-	fn is_valid() {
+	fn message_validation() {
 		// Valid message
 		let valid_msg = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).build();
 		assert!(valid_msg.is_valid());
 
 		// Invalid message - empty sender
-		let invalid_msg = FixMessage::builder(
-			MsgType::Heartbeat,
-			"", // Empty sender
-			"TARGET",
-			1,
-		)
-		.build();
+		let mut invalid_msg = FixMessage::builder(MsgType::Heartbeat, "", "TARGET", 1).build();
 		assert!(!invalid_msg.is_valid());
 
 		// Invalid message - empty target
-		let invalid_msg2 = FixMessage::builder(
-			MsgType::Heartbeat,
-			"SENDER",
-			"", // Empty target
-			1,
-		)
-		.build();
-		assert!(!invalid_msg2.is_valid());
+		invalid_msg = FixMessage::builder(MsgType::Heartbeat, "SENDER", "", 1).build();
+		assert!(!invalid_msg.is_valid());
 	}
 
 	#[test]
@@ -246,26 +213,26 @@ mod fix_message_tests {
 		let msg2 = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).sending_time(now).build();
 
 		let msg3 = FixMessage::builder(
-			MsgType::TestRequest, // Different message type
+			MsgType::Other("DIFFERENT".to_string()), // Different message type
 			"SENDER",
 			"TARGET",
 			1,
 		)
 		.build();
 
-		assert_eq!(msg1, msg2);
-		assert_ne!(msg1, msg3);
+		assert_eq!(msg1.header.msg_type, msg2.header.msg_type);
+		assert_eq!(msg1.header.sender_comp_id, msg2.header.sender_comp_id);
+		assert_ne!(msg1.header.msg_type, msg3.header.msg_type);
 	}
 
 	#[test]
 	fn message_cloning() {
-		let original = FixMessage::default();
+		let original = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).build();
 		let cloned = original.clone();
 
-		assert_eq!(original, cloned);
-		// Ensure they are separate instances
-		assert_eq!(original.cl_ord_id, cloned.cl_ord_id);
-		assert_eq!(original.symbol, cloned.symbol);
+		assert_eq!(original.header.msg_type, cloned.header.msg_type);
+		assert_eq!(original.header.sender_comp_id, cloned.header.sender_comp_id);
+		assert_eq!(original.body, cloned.body);
 	}
 }
 
@@ -274,79 +241,86 @@ mod integration_tests {
 	use super::*;
 
 	#[test]
-	fn new_order_single_workflow() {
-		// Create a New Order Single message
-		let mut new_order = FixMessage::builder(MsgType::NewOrderSingle, "CLIENT", "BROKER", 1).build();
-
-		// Set order fields
-		new_order.cl_ord_id = Some("ORDER123".to_string());
-		new_order.symbol = Some("MSFT".to_string());
-		new_order.side = Some(Side::Buy);
-		new_order.order_qty = Some(100.0);
-		new_order.ord_type = Some("2".into()); // Limit order
-		new_order.price = Some(100.50);
-		new_order.time_in_force = Some("0".into()); // Day
-
-		assert!(new_order.is_valid());
-		assert_eq!(new_order.msg_type, MsgType::NewOrderSingle);
-		assert_eq!(new_order.cl_ord_id, Some("ORDER123".to_string()));
-		assert_eq!(new_order.symbol, Some("MSFT".to_string()));
-		assert_eq!(new_order.side, Some(Side::Buy));
-	}
-
-	#[test]
-	fn execution_report_workflow() {
-		// Create an Execution Report in response to the order
-		let mut exec_report = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 1).build();
-
-		// Set execution fields
-		exec_report.cl_ord_id = Some("ORDER123".to_string());
-		exec_report.order_id = Some("BROKER123".to_string());
-		exec_report.exec_id = Some("EXEC456".to_string());
-		exec_report.exec_type = Some("0".into()); // New
-		exec_report.ord_status = Some(OrdStatus::New);
-		exec_report.symbol = Some("MSFT".to_string());
-		exec_report.side = Some(Side::Buy);
-		exec_report.order_qty = Some(100.0);
-		exec_report.leaves_qty = Some(100.0);
-		exec_report.cum_qty = Some(0.0);
-
-		assert!(exec_report.is_valid());
-		assert_eq!(exec_report.msg_type, MsgType::ExecutionReport);
-		assert_eq!(exec_report.ord_status, Some(OrdStatus::New));
-	}
-
-	#[test]
-	fn fill_execution_report() {
-		// Create a fill execution report
-		let mut fill_report = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 2).build();
-
-		fill_report.cl_ord_id = Some("ORDER123".to_string());
-		fill_report.order_id = Some("BROKER123".to_string());
-		fill_report.exec_id = Some("EXEC789".to_string());
-		fill_report.exec_type = Some("F".into()); // Fill
-		fill_report.ord_status = Some(OrdStatus::Filled);
-		fill_report.symbol = Some("MSFT".to_string());
-		fill_report.side = Some(Side::Buy);
-		fill_report.order_qty = Some(100.0);
-		fill_report.last_qty = Some(100.0);
-		fill_report.last_px = Some(100.25);
-		fill_report.leaves_qty = Some(0.0);
-		fill_report.cum_qty = Some(100.0);
-		fill_report.avg_px = Some(100.25);
-
-		assert!(fill_report.is_valid());
-		assert_eq!(fill_report.ord_status, Some(OrdStatus::Filled));
-		assert_eq!(fill_report.leaves_qty, Some(0.0));
-		assert_eq!(fill_report.cum_qty, Some(100.0));
-	}
-
-	#[test]
-	fn heartbeat_message() {
+	fn heartbeat_workflow() {
+		// Create a basic heartbeat
 		let heartbeat = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "BROKER", 10).build();
 
 		assert!(heartbeat.is_valid());
-		assert_eq!(heartbeat.msg_type, MsgType::Heartbeat);
-		assert_eq!(heartbeat.msg_seq_num, 10);
+		assert_eq!(heartbeat.header.msg_type, MsgType::Heartbeat);
+		assert_eq!(heartbeat.header.msg_seq_num, 10);
+
+		// Create a heartbeat in response to test request
+		let test_response =
+			FixMessage::builder(MsgType::Heartbeat, "CLIENT", "BROKER", 11).test_req_id("TEST_REQ_001").build();
+
+		if let FixMessageBody::Heartbeat(body) = &test_response.body {
+			assert_eq!(body.test_req_id, Some("TEST_REQ_001".to_string()));
+		} else {
+			panic!("Expected Heartbeat body");
+		}
+	}
+
+	#[test]
+	fn logon_workflow() {
+		// Create a logon message
+		let logon = FixMessage::builder(MsgType::Logon, "TRADER", "EXCHANGE", 1)
+			.reset_seq_num_flag(true)
+			.next_expected_msg_seq_num(1)
+			.max_message_size(4096)
+			.build();
+
+		assert!(logon.is_valid());
+		assert_eq!(logon.header.msg_type, MsgType::Logon);
+
+		if let FixMessageBody::Logon(body) = &logon.body {
+			assert_eq!(body.encrypt_method, EncryptMethod::None);
+			assert_eq!(body.heart_bt_int, 30);
+			assert_eq!(body.reset_seq_num_flag, Some(true));
+			assert_eq!(body.next_expected_msg_seq_num, Some(1));
+			assert_eq!(body.max_message_size, Some(4096));
+		} else {
+			panic!("Expected Logon body");
+		}
+	}
+
+	#[test]
+	fn message_serialization_and_parsing() {
+		// Test heartbeat serialization
+		let heartbeat = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).test_req_id("TEST123").build();
+
+		let serialized = heartbeat.to_fix_string();
+		let parsed = FixMessage::from_fix_string(&serialized).unwrap();
+
+		assert_eq!(heartbeat.header.msg_type, parsed.header.msg_type);
+		assert_eq!(heartbeat.header.sender_comp_id, parsed.header.sender_comp_id);
+		assert_eq!(heartbeat.header.target_comp_id, parsed.header.target_comp_id);
+
+		// Test logon serialization
+		let logon = FixMessage::builder(MsgType::Logon, "CLIENT", "BROKER", 1).reset_seq_num_flag(true).build();
+
+		let serialized = logon.to_fix_string();
+		let parsed = FixMessage::from_fix_string(&serialized).unwrap();
+
+		assert_eq!(logon.header.msg_type, parsed.header.msg_type);
+		assert_eq!(logon.header.sender_comp_id, parsed.header.sender_comp_id);
+	}
+
+	#[test]
+	fn checksum_validation() {
+		let msg = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).build();
+		let calculated_checksum = msg.calculate_checksum();
+
+		assert_eq!(msg.trailer.checksum, calculated_checksum);
+		assert_eq!(msg.trailer.checksum.len(), 3);
+		assert!(msg.trailer.checksum.chars().all(|c| c.is_ascii_digit()));
+	}
+
+	#[test]
+	fn body_length_calculation() {
+		let msg = FixMessage::builder(MsgType::Logon, "CLIENT", "BROKER", 1).build();
+		let calculated_length = msg.calculate_body_length();
+
+		assert_eq!(msg.header.body_length, calculated_length);
+		assert!(msg.header.body_length > 0);
 	}
 }

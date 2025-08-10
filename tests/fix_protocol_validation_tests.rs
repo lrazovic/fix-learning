@@ -6,8 +6,8 @@
 //! - Message integrity validation
 //! - Edge cases and error conditions
 
-use fix_learning::{FixMessage, MsgType, OrdStatus, Side};
-use time::macros::datetime;
+use fix_learning::{EncryptMethod, FixMessage, FixMessageBody, MsgType};
+use time::OffsetDateTime;
 
 #[cfg(test)]
 mod checksum_tests {
@@ -16,9 +16,7 @@ mod checksum_tests {
 	#[test]
 	fn test_basic_checksum_calculation() {
 		// Create a simple heartbeat message
-		let message = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.build();
+		let message = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1).build();
 
 		let fix_string = message.to_fix_string();
 
@@ -40,14 +38,7 @@ mod checksum_tests {
 		// Test the checksum calculation algorithm manually
 		// FIX checksum is sum of all bytes modulo 256, formatted as 3-digit string
 
-		let message = FixMessage::builder(MsgType::NewOrderSingle, "TRADER", "EXCHANGE", 100)
-			.sending_time(datetime!(2024-12-01 09:30:00.000 UTC))
-			.cl_ord_id("ORDER123")
-			.symbol("AAPL")
-			.side(Side::Buy)
-			.order_qty(100.0)
-			.price(150.25)
-			.build();
+		let message = FixMessage::builder(MsgType::Heartbeat, "TRADER", "EXCHANGE", 100).test_req_id("TEST123").build();
 
 		let fix_string = message.to_fix_string();
 
@@ -57,7 +48,7 @@ mod checksum_tests {
 
 		let message_without_checksum = parts[0];
 
-		// Calculate checksum manually (without adding extra SOH)
+		// Calculate checksum manually
 		let calculated_checksum: u32 = message_without_checksum.bytes().map(|b| b as u32).sum::<u32>() % 256;
 
 		// Extract actual checksum from message
@@ -70,42 +61,30 @@ mod checksum_tests {
 	#[test]
 	fn test_checksum_with_different_message_types() {
 		let test_cases = vec![
-			(MsgType::Heartbeat, "SIMPLE", "TARGET"),
-			(MsgType::NewOrderSingle, "COMPLEX_SENDER_123", "COMPLEX_TARGET_456"),
-			(MsgType::ExecutionReport, "A", "B"),
-			(MsgType::TestRequest, "VERY_LONG_SENDER_COMPANY_ID", "VERY_LONG_TARGET_COMPANY_ID"),
+			("SIMPLE", "TARGET"),
+			("COMPLEX_SENDER_123", "COMPLEX_TARGET_456"),
+			("A", "B"),
+			("VERY_LONG_SENDER_COMPANY_ID", "VERY_LONG_TARGET_COMPANY_ID"),
 		];
 
-		for (msg_type, sender, target) in test_cases {
-			let message = FixMessage::builder(msg_type.clone(), sender, target, 1)
-				.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-				.build();
+		for (sender, target) in test_cases {
+			// Test heartbeat
+			let heartbeat = FixMessage::builder(MsgType::Heartbeat, sender, target, 1).build();
+			let fix_string = heartbeat.to_fix_string();
+			validate_checksum_format(&fix_string);
 
-			let fix_string = message.to_fix_string();
-
-			// Verify checksum format
-			let checksum_field = fix_string.split("10=").nth(1).unwrap();
-			let checksum_str = checksum_field.trim_end_matches('\x01');
-
-			assert_eq!(checksum_str.len(), 3, "Checksum must be 3 digits for message type {:?}", msg_type);
-			assert!(
-				checksum_str.chars().all(|c| c.is_ascii_digit()),
-				"Checksum must be numeric for message type {:?}",
-				msg_type
-			);
+			// Test logon
+			let logon = FixMessage::builder(MsgType::Logon, sender, target, 1).build();
+			let fix_string = logon.to_fix_string();
+			validate_checksum_format(&fix_string);
 		}
 	}
 
 	#[test]
 	fn test_checksum_with_special_characters() {
 		// Test checksum calculation with messages containing special characters
-		let message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.cl_ord_id("ORDER@123!#$")
-			.symbol("AAPL.USD")
-			.text("Test message with spaces & symbols")
-			.field(5000, "Custom=Value|With|Pipes")
-			.build();
+		let message =
+			FixMessage::builder(MsgType::Heartbeat, "SENDER@123", "TARGET#456", 1).test_req_id("TEST@REQ!#$").build();
 
 		let fix_string = message.to_fix_string();
 
@@ -114,36 +93,43 @@ mod checksum_tests {
 		assert!(parsed.is_ok(), "Message with special characters should parse correctly");
 
 		let parsed_message = parsed.unwrap();
-		assert_eq!(parsed_message.cl_ord_id, Some("ORDER@123!#$".to_string()));
-		assert_eq!(parsed_message.text, Some("Test message with spaces & symbols".to_string()));
+		if let FixMessageBody::Heartbeat(body) = &parsed_message.body {
+			assert_eq!(body.test_req_id, Some("TEST@REQ!#$".to_string()));
+		} else {
+			panic!("Expected Heartbeat body");
+		}
 	}
 
 	#[test]
-	#[should_panic] // TODO: Improve handling of invalid messages.
 	fn test_checksum_edge_cases() {
 		// Test edge cases for checksum calculation
-
-		// Empty optional fields
-		let minimal_message = FixMessage::builder(MsgType::Heartbeat, "", "", 0).build();
-		let fix_string = minimal_message.to_fix_string();
-		let checksum_part = fix_string.split("10=").nth(1).unwrap().trim_end_matches('\x01');
-		assert_eq!(checksum_part.len(), 3);
 
 		// Maximum sequence number
 		let max_seq_message = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", u32::MAX).build();
 		let fix_string = max_seq_message.to_fix_string();
-		let checksum_part = fix_string.split("10=").nth(1).unwrap().trim_end_matches('\x01');
-		assert_eq!(checksum_part.len(), 3);
+		validate_checksum_format(&fix_string);
 
 		// Very long field values
-		let long_text = "A".repeat(1000);
-		let long_message = FixMessage::builder(MsgType::TestRequest, "SENDER", "TARGET", 1)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.text(&long_text)
-			.build();
+		let long_test_req_id = "A".repeat(1000);
+		let long_message =
+			FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).test_req_id(&long_test_req_id).build();
 		let fix_string = long_message.to_fix_string();
+		validate_checksum_format(&fix_string);
+
+		// Logon with all optional fields
+		let full_logon = FixMessage::builder(MsgType::Logon, "CLIENT", "BROKER", 1)
+			.reset_seq_num_flag(true)
+			.next_expected_msg_seq_num(999999)
+			.max_message_size(1048576)
+			.build();
+		let fix_string = full_logon.to_fix_string();
+		validate_checksum_format(&fix_string);
+	}
+
+	fn validate_checksum_format(fix_string: &str) {
 		let checksum_part = fix_string.split("10=").nth(1).unwrap().trim_end_matches('\x01');
-		assert_eq!(checksum_part.len(), 3);
+		assert_eq!(checksum_part.len(), 3, "Checksum must be 3 digits");
+		assert!(checksum_part.chars().all(|c| c.is_ascii_digit()), "Checksum must be numeric: {}", checksum_part);
 	}
 }
 
@@ -153,9 +139,7 @@ mod body_length_tests {
 
 	#[test]
 	fn test_basic_body_length_calculation() {
-		let message = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.build();
+		let message = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1).build();
 
 		let fix_string = message.to_fix_string();
 
@@ -178,75 +162,38 @@ mod body_length_tests {
 	fn test_body_length_with_various_field_counts() {
 		// Test body length calculation with different numbers of fields
 
-		// Minimal message (only required fields)
-		let minimal = FixMessage::builder(MsgType::Heartbeat, "A", "B", 1)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.build();
+		// Minimal heartbeat (only required fields)
+		let minimal = FixMessage::builder(MsgType::Heartbeat, "A", "B", 1).build();
 		validate_body_length(&minimal);
 
-		// Message with several optional fields
-		let medium = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 100)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.cl_ord_id("ORDER123")
-			.symbol("AAPL")
-			.side(Side::Buy)
-			.build();
+		// Heartbeat with optional test request ID
+		let medium =
+			FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 100).test_req_id("TEST_REQ_ID").build();
 		validate_body_length(&medium);
 
-		// Message with many fields
-		let complex = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 500)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.cl_ord_id("CLIENT_ORDER_789")
-			.order_id("BROKER_ORDER_456")
-			.exec_id("EXEC_001")
-			.exec_type("F")
-			.ord_status(OrdStatus::Filled)
-			.symbol("NVDA")
-			.side(Side::Sell)
-			.order_qty(150.0)
-			.price(500.75)
-			.last_qty(150.0)
-			.last_px(500.80)
-			.leaves_qty(0.0)
-			.cum_qty(150.0)
-			.avg_px(500.80)
-			.text("EXECUTION COMPLETE")
-			.field(207, "NASDAQ")
-			.field(6000, "CUSTOM_DATA")
-			.field(9999, "ANOTHER_CUSTOM_FIELD")
+		// Basic logon
+		let logon = FixMessage::builder(MsgType::Logon, "CLIENT", "BROKER", 1).build();
+		validate_body_length(&logon);
+
+		// Complex logon with all fields
+		let complex = FixMessage::builder(MsgType::Logon, "COMPLEX_CLIENT_ID", "COMPLEX_BROKER_ID", 500)
+			.reset_seq_num_flag(true)
+			.next_expected_msg_seq_num(1000)
+			.max_message_size(8192)
+			.poss_dup_flag(true)
+			.poss_resend(false)
+			.orig_sending_time(OffsetDateTime::now_utc())
 			.build();
 		validate_body_length(&complex);
 	}
 
 	#[test]
-	fn test_body_length_with_custom_fields() {
-		let message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.field(5000, "CustomValue1")
-			.field(5001, "CustomValue2")
-			.field(9999, "VeryLongCustomFieldValueThatShouldBeIncludedInBodyLength")
-			.build();
-
-		validate_body_length(&message);
-
-		// Verify custom fields are included in the body
-		let fix_string = message.to_fix_string();
-		assert!(fix_string.contains("5000=CustomValue1"));
-		assert!(fix_string.contains("5001=CustomValue2"));
-		assert!(fix_string.contains("9999=VeryLongCustomFieldValueThatShouldBeIncludedInBodyLength"));
-	}
-
-	#[test]
 	fn test_body_length_accuracy() {
 		// Test that body length is exactly accurate
-		let message = FixMessage::builder(MsgType::NewOrderSingle, "TRADER", "EXCHANGE", 123)
-			.sending_time(datetime!(2024-12-01 09:30:00.000 UTC))
-			.cl_ord_id("ORDER_456")
-			.symbol("MSFT")
-			.side(Side::Buy)
-			.order_qty(200.0)
-			.price(300.50)
-			.field(60, "20241201-09:30:00.000")
+		let message = FixMessage::builder(MsgType::Logon, "TRADER", "EXCHANGE", 123)
+			.reset_seq_num_flag(true)
+			.next_expected_msg_seq_num(124)
+			.max_message_size(4096)
 			.build();
 
 		let fix_string = message.to_fix_string();
@@ -265,10 +212,8 @@ mod body_length_tests {
 	#[test]
 	fn test_body_length_with_unicode_characters() {
 		// Test body length calculation with Unicode characters
-		let message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.text("Test with émojis 🚀 and ñoñó")
-			.field(6000, "价格信息") // Chinese characters
+		let message = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1)
+			.test_req_id("Test with émojis 🚀 and ñoñó")
 			.build();
 
 		validate_body_length(&message);
@@ -283,22 +228,24 @@ mod body_length_tests {
 	fn test_body_length_edge_cases() {
 		// Test edge cases for body length calculation
 
-		// Message with zero-length optional fields
-		let message_with_empty_fields = FixMessage::builder(MsgType::TestRequest, "SENDER", "TARGET", 1)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.cl_ord_id("")
-			.text("")
-			.field(6000, "")
-			.build();
-		validate_body_length(&message_with_empty_fields);
+		// Message with empty test request ID
+		let message_with_empty_field =
+			FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).test_req_id("").build();
+		validate_body_length(&message_with_empty_field);
 
 		// Message with very large field values
 		let large_value = "X".repeat(5000);
-		let large_message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.text(&large_value)
-			.build();
+		let large_message =
+			FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).test_req_id(&large_value).build();
 		validate_body_length(&large_message);
+
+		// Logon with maximum values
+		let max_logon = FixMessage::builder(MsgType::Logon, "SENDER", "TARGET", u32::MAX)
+			.reset_seq_num_flag(true)
+			.next_expected_msg_seq_num(u32::MAX)
+			.max_message_size(u32::MAX)
+			.build();
+		validate_body_length(&max_logon);
 	}
 
 	// Helper function to validate body length calculation
@@ -343,23 +290,12 @@ mod message_integrity_tests {
 	#[test]
 	fn test_complete_message_validation() {
 		// Test that messages with correct checksum and body length parse successfully
-		let message = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 100)
-			.sending_time(datetime!(2024-12-01 10:30:00.500 UTC))
-			.cl_ord_id("ORDER_123")
-			.order_id("BROKER_456")
-			.exec_id("EXEC_789")
-			.ord_status(OrdStatus::Filled)
-			.symbol("AAPL")
-			.side(Side::Buy)
-			.order_qty(100.0)
-			.last_qty(100.0)
-			.last_px(150.25)
-			.leaves_qty(0.0)
-			.cum_qty(100.0)
-			.avg_px(150.25)
+		let heartbeat = FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 100)
+			.test_req_id("INTEGRITY_TEST")
+			.poss_dup_flag(true)
 			.build();
 
-		let fix_string = message.to_fix_string();
+		let fix_string = heartbeat.to_fix_string();
 
 		// Verify the message can be parsed back
 		let parsed = FixMessage::from_fix_string(&fix_string);
@@ -368,68 +304,91 @@ mod message_integrity_tests {
 		let parsed_message = parsed.unwrap();
 
 		// Verify all fields are preserved
-		assert_eq!(parsed_message.msg_type, MsgType::ExecutionReport);
-		assert_eq!(parsed_message.sender_comp_id, "BROKER");
-		assert_eq!(parsed_message.target_comp_id, "CLIENT");
-		assert_eq!(parsed_message.msg_seq_num, 100);
-		assert_eq!(parsed_message.cl_ord_id, Some("ORDER_123".to_string()));
-		assert_eq!(parsed_message.order_id, Some("BROKER_456".to_string()));
-		assert_eq!(parsed_message.exec_id, Some("EXEC_789".to_string()));
-		assert_eq!(parsed_message.ord_status, Some(OrdStatus::Filled));
-		assert_eq!(parsed_message.symbol, Some("AAPL".to_string()));
-		assert_eq!(parsed_message.side, Some(Side::Buy));
-		assert_eq!(parsed_message.order_qty, Some(100.0));
-		assert_eq!(parsed_message.last_qty, Some(100.0));
-		assert_eq!(parsed_message.last_px, Some(150.25));
-		assert_eq!(parsed_message.leaves_qty, Some(0.0));
-		assert_eq!(parsed_message.cum_qty, Some(100.0));
-		assert_eq!(parsed_message.avg_px, Some(150.25));
+		assert_eq!(parsed_message.header.msg_type, MsgType::Heartbeat);
+		assert_eq!(parsed_message.header.sender_comp_id, "CLIENT");
+		assert_eq!(parsed_message.header.target_comp_id, "SERVER");
+		assert_eq!(parsed_message.header.msg_seq_num, 100);
+		assert_eq!(parsed_message.header.poss_dup_flag, Some(true));
+
+		if let FixMessageBody::Heartbeat(body) = &parsed_message.body {
+			assert_eq!(body.test_req_id, Some("INTEGRITY_TEST".to_string()));
+		} else {
+			panic!("Expected Heartbeat body");
+		}
+	}
+
+	#[test]
+	fn test_logon_message_integrity() {
+		let logon = FixMessage::builder(MsgType::Logon, "TRADER", "EXCHANGE", 1)
+			.encrypt_method(EncryptMethod::Des)
+			.heart_bt_int(60)
+			.reset_seq_num_flag(true)
+			.next_expected_msg_seq_num(1)
+			.max_message_size(4096)
+			.build();
+
+		let fix_string = logon.to_fix_string();
+		let parsed = FixMessage::from_fix_string(&fix_string).unwrap();
+
+		assert_eq!(parsed.header.msg_type, MsgType::Logon);
+		assert_eq!(parsed.header.sender_comp_id, "TRADER");
+		assert_eq!(parsed.header.target_comp_id, "EXCHANGE");
+
+		if let FixMessageBody::Logon(body) = &parsed.body {
+			assert_eq!(body.encrypt_method, EncryptMethod::Des);
+			assert_eq!(body.heart_bt_int, 60);
+			assert_eq!(body.reset_seq_num_flag, Some(true));
+			assert_eq!(body.next_expected_msg_seq_num, Some(1));
+			assert_eq!(body.max_message_size, Some(4096));
+		} else {
+			panic!("Expected Logon body");
+		}
 	}
 
 	#[test]
 	fn test_round_trip_consistency() {
 		// Test that serialization -> parsing -> serialization produces identical results
-		let original = FixMessage::builder(MsgType::NewOrderSingle, "TRADER", "EXCHANGE", 50)
-			.sending_time(datetime!(2024-12-01 15:45:30.123 UTC))
-			.cl_ord_id("ROUND_TRIP_TEST")
-			.symbol("GOOGL")
-			.side(Side::Sell)
-			.order_qty(75.0)
-			.price(2800.50)
-			.field(207, "NASDAQ")
-			.field(6000, "ROUND_TRIP_DATA")
-			.build();
+		let test_cases = vec![
+			FixMessage::builder(MsgType::Heartbeat, "A", "B", 1).build(),
+			FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 999)
+				.test_req_id("ROUND_TRIP_TEST")
+				.poss_dup_flag(true)
+				.build(),
+			FixMessage::builder(MsgType::Logon, "CLIENT", "BROKER", 50).build(),
+			FixMessage::builder(MsgType::Logon, "TRADER", "EXCHANGE", 100)
+				.reset_seq_num_flag(true)
+				.next_expected_msg_seq_num(101)
+				.max_message_size(8192)
+				.build(),
+		];
 
-		let first_serialization = original.to_fix_string();
-		let parsed = FixMessage::from_fix_string(&first_serialization).unwrap();
-		let second_serialization = parsed.to_fix_string();
+		for original in test_cases {
+			let first_serialization = original.to_fix_string();
+			let parsed = FixMessage::from_fix_string(&first_serialization).unwrap();
+			let second_serialization = parsed.to_fix_string();
 
-		// The two serializations should be identical
-		assert_eq!(first_serialization, second_serialization);
+			// The two serializations should be identical
+			assert_eq!(first_serialization, second_serialization);
 
-		// Extract and verify checksums are identical
-		let first_checksum = first_serialization.split("10=").nth(1).unwrap().trim_end_matches('\x01');
-		let second_checksum = second_serialization.split("10=").nth(1).unwrap().trim_end_matches('\x01');
-		assert_eq!(first_checksum, second_checksum);
+			// Extract and verify checksums are identical
+			let first_checksum = first_serialization.split("10=").nth(1).unwrap().trim_end_matches('\x01');
+			let second_checksum = second_serialization.split("10=").nth(1).unwrap().trim_end_matches('\x01');
+			assert_eq!(first_checksum, second_checksum);
 
-		// Extract and verify body lengths are identical
-		let first_body_length = first_serialization.split("9=").nth(1).unwrap().split('\x01').next().unwrap();
-		let second_body_length = second_serialization.split("9=").nth(1).unwrap().split('\x01').next().unwrap();
-		assert_eq!(first_body_length, second_body_length);
+			// Extract and verify body lengths are identical
+			let first_body_length = first_serialization.split("9=").nth(1).unwrap().split('\x01').next().unwrap();
+			let second_body_length = second_serialization.split("9=").nth(1).unwrap().split('\x01').next().unwrap();
+			assert_eq!(first_body_length, second_body_length);
+		}
 	}
 
 	#[test]
 	fn test_field_ordering_consistency() {
-		// Test that field ordering is consistent and doesn't affect checksum/body length
-		let message = FixMessage::builder(MsgType::NewOrderSingle, "SENDER", "TARGET", 1)
-			.sending_time(datetime!(2024-12-01 12:00:00.000 UTC))
-			.field(6000, "CUSTOM1") // Add custom fields in different orders
-			.cl_ord_id("ORDER123")
-			.field(207, "EXCHANGE")
-			.symbol("AAPL")
-			.field(9999, "CUSTOM2")
-			.side(Side::Buy)
-			.order_qty(100.0)
+		// Test that field ordering is consistent
+		let message = FixMessage::builder(MsgType::Logon, "SENDER", "TARGET", 1)
+			.reset_seq_num_flag(true)
+			.max_message_size(4096)
+			.next_expected_msg_seq_num(2)
 			.build();
 
 		let fix_string = message.to_fix_string();
@@ -438,13 +397,144 @@ mod message_integrity_tests {
 		let parsed = FixMessage::from_fix_string(&fix_string);
 		assert!(parsed.is_ok());
 
-		// Verify custom fields are in the correct order in the serialized message
-		let custom_field_6000_pos = fix_string.find("6000=CUSTOM1").unwrap();
-		let custom_field_207_pos = fix_string.find("207=EXCHANGE").unwrap();
-		let custom_field_9999_pos = fix_string.find("9999=CUSTOM2").unwrap();
+		// Verify required fields appear before optional fields
+		let msg_type_pos = fix_string.find("35=").unwrap();
+		let sender_pos = fix_string.find("49=").unwrap();
+		let target_pos = fix_string.find("56=").unwrap();
+		let seq_pos = fix_string.find("34=").unwrap();
 
-		// Custom fields should appear in ascending tag order
-		assert!(custom_field_207_pos < custom_field_6000_pos);
-		assert!(custom_field_6000_pos < custom_field_9999_pos);
+		// Standard header fields should appear in correct order
+		assert!(msg_type_pos < sender_pos);
+		assert!(sender_pos < target_pos);
+		assert!(target_pos < seq_pos);
+	}
+
+	#[test]
+	fn test_validation_errors() {
+		// Test various validation scenarios
+
+		// Valid messages should pass validation
+		let valid_heartbeat = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).build();
+		assert!(valid_heartbeat.is_valid());
+
+		let valid_logon = FixMessage::builder(MsgType::Logon, "CLIENT", "BROKER", 1).build();
+		assert!(valid_logon.is_valid());
+
+		// Invalid messages should fail validation
+		let invalid_sender = FixMessage::builder(MsgType::Heartbeat, "", "TARGET", 1).build();
+		assert!(!invalid_sender.is_valid());
+
+		let invalid_target = FixMessage::builder(MsgType::Heartbeat, "SENDER", "", 1).build();
+		assert!(!invalid_target.is_valid());
+	}
+
+	#[test]
+	fn test_checksum_corruption_detection() {
+		// Test that corrupted checksums are detected
+		let message = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).build();
+		let mut fix_string = message.to_fix_string();
+
+		// Corrupt the checksum
+		let checksum_pos = fix_string.rfind("10=").unwrap();
+		fix_string.replace_range(checksum_pos + 3..checksum_pos + 6, "999");
+
+		// Parsing should still succeed (we don't validate checksum on parse currently)
+		// but the message integrity is compromised
+		let parsed = FixMessage::from_fix_string(&fix_string);
+		assert!(parsed.is_ok());
+
+		// The calculated checksum should be different from the corrupted one
+		let parsed_message = parsed.unwrap();
+		let recalculated_checksum = parsed_message.calculate_checksum();
+		assert_ne!(recalculated_checksum, "999");
+	}
+
+	#[test]
+	fn test_body_length_corruption_detection() {
+		// Test with incorrect body length
+		let message = FixMessage::builder(MsgType::Heartbeat, "SENDER", "TARGET", 1).build();
+		let fix_string = message.to_fix_string();
+
+		// Extract the correct body length
+		let body_length_str = fix_string.split("9=").nth(1).unwrap().split('\x01').next().unwrap();
+		let correct_body_length: u32 = body_length_str.parse().unwrap();
+
+		// Create a message with incorrect body length
+		let incorrect_body_length = correct_body_length + 10;
+		let corrupted_fix_string =
+			fix_string.replace(&format!("9={}", correct_body_length), &format!("9={}", incorrect_body_length));
+
+		// The message should still parse (we don't validate body length on parse currently)
+		let parsed = FixMessage::from_fix_string(&corrupted_fix_string);
+		assert!(parsed.is_ok());
+
+		// But the recalculated body length should be different
+		let parsed_message = parsed.unwrap();
+		let recalculated_body_length = parsed_message.calculate_body_length();
+		assert_ne!(recalculated_body_length, incorrect_body_length);
+		assert_eq!(recalculated_body_length, correct_body_length);
+	}
+}
+
+#[cfg(test)]
+mod encryption_method_tests {
+	use super::*;
+
+	#[test]
+	fn test_all_encryption_methods() {
+		let encryption_methods = vec![
+			EncryptMethod::None,
+			EncryptMethod::Pkcs,
+			EncryptMethod::Des,
+			EncryptMethod::PkcsAndDes,
+			EncryptMethod::PgpAndDes,
+			EncryptMethod::PgpAndMd5,
+			EncryptMethod::PemAndMd5,
+		];
+
+		for method in encryption_methods {
+			let logon =
+				FixMessage::builder(MsgType::Logon, "CLIENT", "BROKER", 1).encrypt_method(method.clone()).build();
+
+			// Verify message is valid
+			assert!(logon.is_valid());
+
+			// Verify encryption method is preserved through serialization
+			let fix_string = logon.to_fix_string();
+			let parsed = FixMessage::from_fix_string(&fix_string).unwrap();
+
+			if let FixMessageBody::Logon(body) = &parsed.body {
+				assert_eq!(body.encrypt_method, method);
+			} else {
+				panic!("Expected Logon body");
+			}
+		}
+	}
+
+	#[test]
+	fn test_encryption_method_serialization() {
+		// Test that encryption methods are serialized with correct FIX values
+		let test_cases = vec![
+			(EncryptMethod::None, "0"),
+			(EncryptMethod::Pkcs, "1"),
+			(EncryptMethod::Des, "2"),
+			(EncryptMethod::PkcsAndDes, "3"),
+			(EncryptMethod::PgpAndDes, "4"),
+			(EncryptMethod::PgpAndMd5, "5"),
+			(EncryptMethod::PemAndMd5, "6"),
+		];
+
+		for (method, expected_value) in test_cases {
+			let logon =
+				FixMessage::builder(MsgType::Logon, "CLIENT", "BROKER", 1).encrypt_method(method.clone()).build();
+			let fix_string = logon.to_fix_string();
+
+			assert!(
+				fix_string.contains(&format!("98={}\x01", expected_value)),
+				"Expected encryption method {} in: {}",
+				expected_value,
+				fix_string.replace('\x01', " | ")
+			);
+		}
 	}
 }
