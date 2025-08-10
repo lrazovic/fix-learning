@@ -55,13 +55,29 @@ fix_enum!(Strict OrdStatus {
 	PendingReplace     => "E",
 });
 
-/// The Start of Heading control character, value 0x01, is used for field termination.
+/// The Start of Heading control character, value 0x01, it is used for field termination.
 pub const SOH: &str = "\x01";
 
 /// Time/date combination represented in UTC (Universal Time Coordinated, also known as "GMT")
 /// in either YYYYMMDD-HH:MM:SS (whole seconds) or YYYYMMDD-HH:MM:SS.sss (milliseconds) format, colons, dash, and period required.
 static FORMAT_TIME: &[BorrowedFormatItem<'_>] =
 	format_description!("[year][month][day]-[hour]:[minute]:[second].[subsecond digits:3]");
+
+// TODO: To reduce memory consumption we can have something like:
+// pub struct FixMessage {
+//    // Header (always small, keep as-is)
+//    pub header: FixHeader,
+//
+//    // Message-specific body (only allocates what's needed)
+//    pub body: MessageBody,
+//
+//    // Compact additional fields, maybe we can use a smallvec, but I would love to minime the external dependencies.
+//    pub additional_fields: BTreeMap<u32, String>,
+//
+//    // Trailer
+//    pub checksum: Cow<'static, str>,
+// }
+//
 
 // Main FIX 4.2 Message struct
 #[derive(Debug, Clone, PartialEq)]
@@ -491,7 +507,7 @@ impl FixMessage {
 		let calculated_checksum = Self::calculate_checksum(&message_without_checksum);
 		fields.push(format!("10={:03}", calculated_checksum));
 
-		// Join all fields with SOH
+		// Join all fields with SOH, add the SOH character at the end.
 		fields.join(SOH) + SOH
 	}
 
@@ -508,7 +524,7 @@ impl FixMessage {
 			return Err("Empty FIX message".to_string());
 		}
 
-		// TODO: Restrict the Default impl to cfg(test) and find a better way to construct an empty `FixMessage`.
+		// TODO: Restrict the Default impl to cfg(test) and find a better way to construct an "empty" `FixMessage`.
 		let mut message = Self::default();
 
 		for field in fields {
