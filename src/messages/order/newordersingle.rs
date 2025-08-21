@@ -62,6 +62,12 @@ impl WriteTo for NewOrderSingleBody {
 	}
 }
 
+impl Default for NewOrderSingleBody {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl NewOrderSingleBody {
 	/// Create a new empty heartbeat body
 	pub fn new() -> Self {
