@@ -80,3 +80,7 @@ pub trait Validate {
 		self.validate().is_ok()
 	}
 }
+
+pub trait WriteTo {
+	fn write_to(&self, buffer: &mut String);
+}

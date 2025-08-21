@@ -4,12 +4,13 @@
 //! that is common to all FIX messages, along with its validation logic.
 
 use crate::{
-	FORMAT_TIME,
+	FORMAT_TIME, SOH,
 	common::{
 		enums::MsgType,
-		validation::{Validate, ValidationError},
+		validation::{Validate, ValidationError, WriteTo},
 	},
 };
+use std::fmt::Write;
 use time::{Duration, OffsetDateTime, PrimitiveDateTime, UtcOffset, macros::format_description};
 
 /// Standard FIX message header
@@ -71,6 +72,27 @@ impl Validate for FixHeader {
 			return Err(ValidationError::EmptyMessage);
 		}
 		Ok(())
+	}
+}
+
+impl WriteTo for FixHeader {
+	fn write_to(&self, buffer: &mut String) {
+		write!(buffer, "8={}{}", self.begin_string, SOH).unwrap();
+		write!(buffer, "9={}{}", self.body_length, SOH).unwrap();
+		write!(buffer, "35={}{}", self.msg_type, SOH).unwrap();
+		write!(buffer, "49={}{}", self.sender_comp_id, SOH).unwrap();
+		write!(buffer, "56={}{}", self.target_comp_id, SOH).unwrap();
+		write!(buffer, "34={}{}", self.msg_seq_num, SOH).unwrap();
+		write!(buffer, "52={}{}", self.sending_time, SOH).unwrap();
+		if let Some(ref poss_dup_flag) = self.poss_dup_flag {
+			write!(buffer, "43={}{}", poss_dup_flag, SOH).unwrap();
+		}
+		if let Some(ref poss_resend) = self.poss_resend {
+			write!(buffer, "97={}{}", poss_resend, SOH).unwrap();
+		}
+		if let Some(ref orig_sending_time) = self.orig_sending_time {
+			write!(buffer, "122={}{}", orig_sending_time, SOH).unwrap();
+		}
 	}
 }
 

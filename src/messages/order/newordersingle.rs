@@ -6,7 +6,7 @@
 
 use crate::{
 	FORMAT_TIME, SOH, Side,
-	common::{Validate, ValidationError},
+	common::{Validate, ValidationError, validation::WriteTo},
 };
 use std::fmt::Write;
 use time::OffsetDateTime;
@@ -45,6 +45,23 @@ impl Validate for NewOrderSingleBody {
 	}
 }
 
+impl WriteTo for NewOrderSingleBody {
+	fn write_to(&self, buffer: &mut String) {
+		write!(buffer, "11={}{}", self.cl_ord_id, SOH).unwrap();
+		write!(buffer, "21={}{}", self.handl_inst, SOH).unwrap();
+		write!(buffer, "55={}{}", self.symbol, SOH).unwrap();
+		write!(buffer, "54={}{}", self.side, SOH).unwrap();
+		write!(buffer, "60={}{}", self.transact_time.format(FORMAT_TIME).unwrap(), SOH).unwrap();
+		write!(buffer, "40={}{}", self.ord_type, SOH).unwrap();
+		if let Some(security_exchange) = &self.security_exchange {
+			write!(buffer, "207={}{}", security_exchange, SOH).unwrap();
+		}
+		if let Some(price) = self.price {
+			write!(buffer, "44={}{}", price, SOH).unwrap();
+		}
+	}
+}
+
 impl NewOrderSingleBody {
 	/// Create a new empty heartbeat body
 	pub fn new() -> Self {
@@ -59,22 +76,6 @@ impl NewOrderSingleBody {
 			transact_time: OffsetDateTime::now_utc(),
 			ord_type: String::new(),
 			security_exchange: None,
-		}
-	}
-
-	/// Serialize new order single-specific fields to FIX format
-	pub(crate) fn write_fields(&self, buf: &mut String) {
-		write!(buf, "11={}{}", self.cl_ord_id, SOH).unwrap();
-		write!(buf, "21={}{}", self.handl_inst, SOH).unwrap();
-		write!(buf, "55={}{}", self.symbol, SOH).unwrap();
-		write!(buf, "54={}{}", self.side, SOH).unwrap();
-		write!(buf, "60={}{}", self.transact_time.format(FORMAT_TIME).unwrap(), SOH).unwrap();
-		write!(buf, "40={}{}", self.ord_type, SOH).unwrap();
-		if let Some(security_exchange) = &self.security_exchange {
-			write!(buf, "207={}{}", security_exchange, SOH).unwrap();
-		}
-		if let Some(price) = self.price {
-			write!(buf, "44={}{}", price, SOH).unwrap();
 		}
 	}
 

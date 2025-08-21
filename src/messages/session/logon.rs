@@ -4,7 +4,7 @@
 //! initiate a FIX session between two counterparties. The Logon message
 //! establishes session parameters and authentication.
 
-use crate::common::{EncryptMethod, SOH, Validate, ValidationError};
+use crate::common::{EncryptMethod, SOH, Validate, ValidationError, validation::WriteTo};
 use std::fmt::Write;
 
 /// Logon message body (Tag 35=A)
@@ -46,6 +46,23 @@ impl Validate for LogonBody {
 	}
 }
 
+impl WriteTo for LogonBody {
+	fn write_to(&self, buffer: &mut String) {
+		write!(buffer, "98={}{}", self.encrypt_method, SOH).unwrap();
+		write!(buffer, "108={}{}", self.heart_bt_int, SOH).unwrap();
+
+		if let Some(flag) = self.reset_seq_num_flag {
+			write!(buffer, "141={}{}", if flag { "Y" } else { "N" }, SOH).unwrap();
+		}
+		if let Some(seq_num) = self.next_expected_msg_seq_num {
+			write!(buffer, "789={}{}", seq_num, SOH).unwrap();
+		}
+		if let Some(size) = self.max_message_size {
+			write!(buffer, "383={}{}", size, SOH).unwrap();
+		}
+	}
+}
+
 impl LogonBody {
 	/// Create a new logon body with required fields
 	pub fn new(encrypt_method: EncryptMethod, heart_bt_int: u32) -> Self {
@@ -68,22 +85,6 @@ impl LogonBody {
 	pub const fn with_max_message_size(mut self, size: u32) -> Self {
 		self.max_message_size = Some(size);
 		self
-	}
-
-	/// Serialize logon-specific fields to FIX format
-	pub(crate) fn write_fields(&self, buf: &mut String) {
-		write!(buf, "98={}{}", self.encrypt_method, SOH).unwrap();
-		write!(buf, "108={}{}", self.heart_bt_int, SOH).unwrap();
-
-		if let Some(flag) = self.reset_seq_num_flag {
-			write!(buf, "141={}{}", if flag { "Y" } else { "N" }, SOH).unwrap();
-		}
-		if let Some(seq_num) = self.next_expected_msg_seq_num {
-			write!(buf, "789={}{}", seq_num, SOH).unwrap();
-		}
-		if let Some(size) = self.max_message_size {
-			write!(buf, "383={}{}", size, SOH).unwrap();
-		}
 	}
 
 	/// Parse a logon-specific field

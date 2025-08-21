@@ -3,12 +3,17 @@
 //! This module contains the standard FIX message trailer structure
 //! that is common to all FIX messages, along with its validation logic.
 
-use crate::common::validation::{Validate, ValidationError};
+use crate::{
+	SOH,
+	common::validation::{Validate, ValidationError, WriteTo},
+};
+use std::fmt::Write;
 
 /// Standard FIX message trailer
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
 pub struct FixTrailer {
 	// Required Trailer Fields
+	// TODO: This always has len == 3, so we can probably avoid using a String.
 	pub checksum: String, // Tag 10 - Checksum of the message, always unencrypted, always last field in message.
 
 	// Optional Trailer Fields
@@ -19,6 +24,19 @@ pub struct FixTrailer {
 impl Validate for FixTrailer {
 	fn validate(&self) -> Result<(), ValidationError> {
 		Ok(())
+	}
+}
+
+impl WriteTo for FixTrailer {
+	fn write_to(&self, buffer: &mut String) {
+		// Optional trailer fields
+		if let Some(sig_len) = self.signature_length {
+			write!(buffer, "93={}{}", sig_len, SOH).unwrap();
+		}
+		if let Some(ref signature) = self.signature {
+			write!(buffer, "89={}{}", signature, SOH).unwrap();
+		}
+		write!(buffer, "10={}{}", self.checksum, SOH).unwrap();
 	}
 }
 

@@ -46,10 +46,7 @@ pub mod common;
 pub mod macros;
 pub mod messages;
 
-use std::{
-	collections::HashMap,
-	fmt::{Display, Write},
-};
+use std::{collections::HashMap, fmt::Display};
 
 // Re-export commonly used types
 pub use builder::FixMessageBuilder;
@@ -59,11 +56,13 @@ pub use common::{
 };
 pub use messages::{FixMessageBody, HeartbeatBody, LogonBody};
 
+use crate::common::validation::WriteTo;
+
 /// Main FIX 4.2 Message structure
 ///
-/// This is the primary structure representing a complete FIX message with
-/// header, body, and trailer. The message body uses an enum to provide
-/// memory-efficient storage by only allocating fields needed for each
+/// This is the primary structure representing a complete FIX 4.2 message with
+/// header, body, and trailer.
+/// The message body uses an enum to provide memory-efficient storage by only allocating fields needed for each
 /// specific message type.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FixMessage {
@@ -97,6 +96,7 @@ impl Validate for FixMessage {
 
 impl FixMessage {
 	/// Create a new FIX message with required fields
+	/// The constructor is private since a user should use the FixMessageBuilder to build a FixMessage.
 	fn new(
 		msg_type: MsgType,
 		sender_comp_id: impl Into<String>,
@@ -118,83 +118,25 @@ impl FixMessage {
 		self.validate().is_ok()
 	}
 
-	pub fn calculate_length_and_checksum(&self) -> (u32, String) {
-		// Serialize body and trailer once
-		let body_and_trailer = self.write_body_and_trailer_without_checksum();
-		let body_length = body_and_trailer.len() as u32;
-
-		// Calculate checksum
-		let checksum = &self.trailer.checksum;
-
-		(body_length, format!("{:03}", checksum))
-	}
-
-	/// Calculate body length (excludes header tags 8, 9, 10 and the checksum)
-	pub fn calculate_body_length(&self) -> u32 {
-		self.calculate_length_and_checksum().0
-	}
-
-	/// Write to existing buffer - zero additional allocations
-	pub fn write_body_and_trailer_without_checksum(&self) -> String {
+	///
+	pub fn write_message(&self) -> String {
 		let mut buf = String::with_capacity(256); // Single allocation
-		// Message type
-		write!(buf, "35={}{}", self.header.msg_type, SOH).unwrap();
 
-		// Required header fields
-		write!(buf, "49={}{}", self.header.sender_comp_id, SOH).unwrap();
-		write!(buf, "56={}{}", self.header.target_comp_id, SOH).unwrap();
-		write!(buf, "34={}{}", self.header.msg_seq_num, SOH).unwrap();
+		self.header.write_to(&mut buf);
+		self.body.write_to(&mut buf);
+		self.trailer.write_to(&mut buf);
 
-		// Format sending time
-		// FIXME: This formatting operation costs us the ~40% of the total serialization time.
-		let sending_time_str = self.header.sending_time.format(&FORMAT_TIME).unwrap();
-		write!(buf, "52={}{}", sending_time_str, SOH).unwrap();
-
-		// Optional header fields
-		if let Some(flag) = self.header.poss_dup_flag {
-			write!(buf, "43={}{}", if flag { "Y" } else { "N" }, SOH).unwrap();
-		}
-		if let Some(flag) = self.header.poss_resend {
-			write!(buf, "97={}{}", if flag { "Y" } else { "N" }, SOH).unwrap();
-		}
-		if let Some(time) = self.header.orig_sending_time {
-			let time_str = time.format(&FORMAT_TIME).unwrap();
-			write!(buf, "122={}{}", time_str, SOH).unwrap();
-		}
-
-		// Body fields - write directly to same buffer
-		self.body.write_fields(&mut buf);
-
-		// Optional trailer fields
-		if let Some(sig_len) = self.trailer.signature_length {
-			write!(buf, "93={}{}", sig_len, SOH).unwrap();
-		}
-		if let Some(ref signature) = self.trailer.signature {
-			write!(buf, "89={}{}", signature, SOH).unwrap();
-		}
 		buf
 	}
 
 	/// Serialize the complete message to FIX wire format
 	pub fn to_fix_string(&self) -> String {
 		if let Some(body_and_trailer) = &self.serialized_body_and_trailer {
-			return format!(
-				"8={}{}9={}{}{}10={}{}",
-				self.header.begin_string,
-				SOH,
-				self.header.body_length,
-				SOH,
-				body_and_trailer,
-				self.trailer.checksum,
-				SOH
-			);
+			return body_and_trailer.to_owned();
 		}
-		let body_and_trailer = self.write_body_and_trailer_without_checksum();
+		let body_and_trailer = self.write_message();
 
-		format!(
-			"8={}{}9={}{}{}10={}{}",
-			self.header.begin_string, SOH, self.header.body_length, SOH, body_and_trailer, self.trailer.checksum, SOH
-		)
+		body_and_trailer
 	}
 
 	/// Parse a FIX message from wire format

@@ -7,7 +7,7 @@
 pub mod order;
 pub mod session;
 
-use crate::common::{Validate, ValidationError};
+use crate::common::{Validate, ValidationError, validation::WriteTo};
 
 // Re-export message body types
 pub use order::NewOrderSingleBody;
@@ -41,17 +41,18 @@ impl Validate for FixMessageBody {
 	}
 }
 
-impl FixMessageBody {
-	/// Serialize the message body fields to FIX format
-	pub(crate) fn write_fields(&self, buf: &mut String) {
+impl WriteTo for FixMessageBody {
+	fn write_to(&self, buffer: &mut String) {
 		match self {
-			Self::Heartbeat(body) => body.write_fields(buf),
-			Self::Logon(body) => body.write_fields(buf),
-			Self::NewOrderSingle(body) => body.write_fields(buf),
-			Self::Other => {}, // Nothing to write
+			Self::Heartbeat(body) => body.write_to(buffer),
+			Self::Logon(body) => body.write_to(buffer),
+			Self::NewOrderSingle(body) => body.write_to(buffer),
+			Self::Other => unimplemented!(),
 		}
 	}
+}
 
+impl FixMessageBody {
 	/// Parse a field into the appropriate message body
 	pub(crate) fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
 		match self {
