@@ -71,6 +71,46 @@ impl FixHeader {
 			write!(buffer, "122={}{}", orig_sending_time.format(&FORMAT_TIME).unwrap(), SOH).unwrap();
 		}
 	}
+
+	/// Parse a field from tag-value pair into the header
+	pub fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
+		match tag {
+			8 =>
+				if value != "FIX.4.2" {
+					return Err(format!("Unsupported FIX version: {}", value));
+				},
+			9 => {
+				self.body_length = value.parse().map_err(|_| "Invalid BodyLength")?;
+			},
+			35 => {
+				// MsgType is immutable after creation, so we skip parsing it here
+				// The caller should ensure the message type matches
+			},
+			49 => {
+				self.sender_comp_id = value.to_string();
+			},
+			56 => {
+				self.target_comp_id = value.to_string();
+			},
+			34 => {
+				self.msg_seq_num = value.parse().map_err(|_| "Invalid MsgSeqNum")?;
+			},
+			52 => {
+				self.sending_time = parse_fix_timestamp(value)?;
+			},
+			43 => {
+				self.poss_dup_flag = Some(value == "Y");
+			},
+			97 => {
+				self.poss_resend = Some(value == "Y");
+			},
+			122 => {
+				self.orig_sending_time = Some(parse_fix_timestamp(value)?);
+			},
+			_ => return Err(format!("Unknown header field: {}", tag)),
+		}
+		Ok(())
+	}
 }
 
 impl Validate for FixHeader {

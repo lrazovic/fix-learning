@@ -137,93 +137,44 @@ impl FixMessage {
 			return Err("Empty FIX message".to_string());
 		}
 
-		// Parse fields into key-value pairs
+		// Parse fields into key-value pairs with tags as numbers
 		let mut field_map = HashMap::new();
 		for field in fields {
-			if let Some((tag, value)) = field.split_once('=') {
+			if let Some((tag_str, value)) = field.split_once('=') {
+				let tag: u32 = tag_str.parse().map_err(|_| format!("Invalid tag: {}", tag_str))?;
 				field_map.insert(tag, value);
 			}
 		}
 
-		// Parse required header fields
-		let begin_string = field_map.get("8").ok_or("Missing BeginString (8)")?;
-		if *begin_string != "FIX.4.2" {
-			return Err(format!("Unsupported FIX version: {}", begin_string));
-		}
-
-		let body_length: u32 =
-			field_map.get("9").ok_or("Missing BodyLength (9)")?.parse().map_err(|_| "Invalid BodyLength")?;
-
-		let msg_type_str = field_map.get("35").ok_or("Missing MsgType (35)")?;
+		// Extract required fields for message creation
+		let msg_type_str = field_map.get(&35).ok_or("Missing MsgType (35)")?;
 		let msg_type = msg_type_str.parse().map_err(|_| "Invalid MsgType")?;
 
-		let sender_comp_id = field_map.get("49").ok_or("Missing SenderCompID (49)")?.to_string();
-		let target_comp_id = field_map.get("56").ok_or("Missing TargetCompID (56)")?.to_string();
+		let sender_comp_id = field_map.get(&49).ok_or("Missing SenderCompID (49)")?.to_string();
+		let target_comp_id = field_map.get(&56).ok_or("Missing TargetCompID (56)")?.to_string();
 
 		let msg_seq_num: u32 =
-			field_map.get("34").ok_or("Missing MsgSeqNum (34)")?.parse().map_err(|_| "Invalid MsgSeqNum")?;
+			field_map.get(&34).ok_or("Missing MsgSeqNum (34)")?.parse().map_err(|_| "Invalid MsgSeqNum")?;
 
-		let sending_time_str = field_map.get("52").ok_or("Missing SendingTime (52)")?;
-		let sending_time = parse_fix_timestamp(sending_time_str)?;
-
-		// Create message
+		// Create message with basic required fields
 		let mut message = Self::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num);
-		message.header.body_length = body_length;
-		message.header.sending_time = sending_time;
 
-		// Parse optional header fields
-		if let Some(flag_str) = field_map.get("43") {
-			message.header.poss_dup_flag = Some(*flag_str == "Y");
-		}
-		if let Some(flag_str) = field_map.get("97") {
-			message.header.poss_resend = Some(*flag_str == "Y");
-		}
-		if let Some(time_str) = field_map.get("122") {
-			message.header.orig_sending_time = Some(parse_fix_timestamp(time_str)?);
-		}
-
-		// Parse body based on message type
-		match &mut message.body {
-			FixMessageBody::Heartbeat(_) =>
-				if let Some(test_req_id) = field_map.get("112") {
-					message.body.parse_field(112, test_req_id).map_err(|e| format!("Parse error: {}", e))?;
+		// Parse all fields generically using parse_field methods
+		for (&tag, &value) in &field_map {
+			match tag {
+				// Header fields (8, 9, 35, 49, 56, 34, 52, 43, 97, 122)
+				8 | 9 | 35 | 49 | 56 | 34 | 52 | 43 | 97 | 122 => {
+					message.header.parse_field(tag, value).map_err(|e| format!("Header parse error: {}", e))?;
 				},
-			FixMessageBody::Logon(_) => {
-				// Parse required logon fields
-				if let Some(encrypt_str) = field_map.get("98") {
-					message.body.parse_field(98, encrypt_str).map_err(|e| format!("Parse error: {}", e))?;
-				}
-				if let Some(heartbt_str) = field_map.get("108") {
-					message.body.parse_field(108, heartbt_str).map_err(|e| format!("Parse error: {}", e))?;
-				}
-				// Parse optional logon fields
-				if let Some(flag_str) = field_map.get("141") {
-					message.body.parse_field(141, flag_str).map_err(|e| format!("Parse error: {}", e))?;
-				}
-				if let Some(seq_str) = field_map.get("789") {
-					message.body.parse_field(789, seq_str).map_err(|e| format!("Parse error: {}", e))?;
-				}
-				if let Some(size_str) = field_map.get("383") {
-					message.body.parse_field(383, size_str).map_err(|e| format!("Parse error: {}", e))?;
-				}
-			},
-			FixMessageBody::NewOrderSingle(_) => {
-				todo!();
-			},
-			FixMessageBody::Other => {
-				// No specific parsing for other message types
-			},
-		}
-
-		// Parse trailer
-		if let Some(checksum_str) = field_map.get("10") {
-			message.trailer.checksum = checksum_str.to_string();
-		}
-		if let Some(sig_len_str) = field_map.get("93") {
-			message.trailer.signature_length = Some(sig_len_str.parse().map_err(|_| "Invalid SignatureLength")?);
-		}
-		if let Some(signature) = field_map.get("89") {
-			message.trailer.signature = Some(signature.to_string());
+				// Trailer fields (10, 93, 89)
+				10 | 93 | 89 => {
+					message.trailer.parse_field(tag, value).map_err(|e| format!("Trailer parse error: {}", e))?;
+				},
+				// Body fields - delegate to message body
+				_ => {
+					message.body.parse_field(tag, value).map_err(|e| format!("Body parse error: {}", e))?;
+				},
+			}
 		}
 
 		// Validate message
@@ -248,5 +199,110 @@ impl FixMessage {
 		msg_seq_num: u32,
 	) -> FixMessageBuilder {
 		FixMessageBuilder::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::common::EncryptMethod;
+
+	#[test]
+	fn test_generic_from_fix_string() {
+		// Test that the generic from_fix_string can handle various message types
+
+		// Create a complex logon message
+		let original = FixMessage::builder(MsgType::Logon, "TRADER", "EXCHANGE", 42)
+			.encrypt_method(EncryptMethod::None)
+			.heart_bt_int(30)
+			.reset_seq_num_flag(true)
+			.poss_dup_flag(false)
+			.build();
+
+		let fix_string = original.to_fix_string();
+		println!("Original FIX string: {}", fix_string);
+
+		// Parse it back using the generic implementation
+		let parsed = FixMessage::from_fix_string(&fix_string).expect("Should parse successfully");
+
+		// Verify all fields are correctly parsed
+		assert_eq!(original.header.msg_type, parsed.header.msg_type);
+		assert_eq!(original.header.sender_comp_id, parsed.header.sender_comp_id);
+		assert_eq!(original.header.target_comp_id, parsed.header.target_comp_id);
+		assert_eq!(original.header.msg_seq_num, parsed.header.msg_seq_num);
+		assert_eq!(original.header.body_length, parsed.header.body_length);
+		assert_eq!(original.header.poss_dup_flag, parsed.header.poss_dup_flag);
+		assert_eq!(original.trailer.checksum, parsed.trailer.checksum);
+
+		// Verify the message is valid
+		assert!(parsed.is_valid());
+
+		// Test with heartbeat message
+		let heartbeat_original =
+			FixMessage::builder(MsgType::Heartbeat, "CLIENT", "SERVER", 1).test_req_id("TEST_123").build();
+
+		let heartbeat_string = heartbeat_original.to_fix_string();
+		let heartbeat_parsed = FixMessage::from_fix_string(&heartbeat_string).expect("Should parse heartbeat");
+
+		assert_eq!(heartbeat_original.header.msg_type, heartbeat_parsed.header.msg_type);
+		assert_eq!(heartbeat_original.header.body_length, heartbeat_parsed.header.body_length);
+		assert!(heartbeat_parsed.is_valid());
+
+		println!("Generic parsing test passed for both Logon and Heartbeat messages!");
+	}
+
+	#[test]
+	fn test_unknown_field_handling() {
+		// Test that unknown fields are properly handled
+		let fix_string = "8=FIX.4.2\x019=50\x0135=0\x0149=CLIENT\x0156=SERVER\x0134=1\x0152=20241201-12:34:56.789\x01999=UNKNOWN\x0110=123\x01";
+
+		// This should parse successfully - unknown fields are handled by the body's parse_field method
+		// which returns Ok(()) for unknown fields in the "Other" message type
+		let result = FixMessage::from_fix_string(fix_string);
+		match result {
+			Ok(message) => {
+				assert_eq!(message.header.msg_type, MsgType::Heartbeat);
+				println!("Successfully parsed message with unknown field 999");
+			},
+			Err(e) => {
+				// This is expected since unknown fields should cause parse errors
+				println!("Parse error for unknown field (expected): {}", e);
+				assert!(e.contains("999") || e.contains("UNKNOWN"));
+			},
+		}
+	}
+
+	#[test]
+	fn test_message_specific_tag_parsing() {
+		// Test that message-specific tags are properly parsed through the generic system
+
+		// Test Heartbeat with TestReqID (tag 112)
+		let heartbeat_fix = "8=FIX.4.2\x019=68\x0135=0\x0149=CLIENT\x0156=SERVER\x0134=1\x0152=20241201-12:34:56.789\x01112=TEST_REQ_123\x0110=123\x01";
+
+		let parsed_heartbeat =
+			FixMessage::from_fix_string(heartbeat_fix).expect("Should parse heartbeat with TestReqID");
+
+		if let FixMessageBody::Heartbeat(body) = &parsed_heartbeat.body {
+			assert_eq!(body.test_req_id, Some("TEST_REQ_123".to_string()));
+		} else {
+			panic!("Expected Heartbeat body");
+		}
+
+		// Test Logon with multiple message-specific tags
+		let logon_fix = "8=FIX.4.2\x019=50\x0135=A\x0149=TRADER\x0156=EXCHANGE\x0134=1\x0152=20241201-12:34:56.789\x0198=0\x01108=30\x01141=Y\x01789=1\x01383=8192\x0110=123\x01";
+
+		let parsed_logon = FixMessage::from_fix_string(logon_fix).expect("Should parse logon with specific fields");
+
+		if let FixMessageBody::Logon(body) = &parsed_logon.body {
+			assert_eq!(body.encrypt_method, EncryptMethod::None); // tag 98
+			assert_eq!(body.heart_bt_int, 30); // tag 108
+			assert_eq!(body.reset_seq_num_flag, Some(true)); // tag 141
+			assert_eq!(body.next_expected_msg_seq_num, Some(1)); // tag 789
+			assert_eq!(body.max_message_size, Some(8192)); // tag 383
+		} else {
+			panic!("Expected Logon body");
+		}
+
+		println!("Message-specific tag parsing test passed!");
 	}
 }

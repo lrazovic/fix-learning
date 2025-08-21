@@ -38,6 +38,23 @@ impl FixTrailer {
 			write!(buffer, "89={}{}", signature, SOH).unwrap();
 		}
 	}
+
+	/// Parse a field from tag-value pair into the trailer
+	pub fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
+		match tag {
+			10 => {
+				self.checksum = value.to_string();
+			},
+			93 => {
+				self.signature_length = Some(value.parse().map_err(|_| "Invalid SignatureLength")?);
+			},
+			89 => {
+				self.signature = Some(value.to_string());
+			},
+			_ => return Err(format!("Unknown trailer field: {}", tag)),
+		}
+		Ok(())
+	}
 }
 
 impl WriteTo for FixTrailer {
