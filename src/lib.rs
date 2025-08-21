@@ -72,9 +72,6 @@ pub struct FixMessage {
 	pub body: FixMessageBody,
 	/// Standard message trailer with checksum and optional signature
 	pub trailer: FixTrailer,
-
-	/// FIX Serialized body and trailer without checksum, useful to memoize serialization.
-	serialized_body_and_trailer: Option<String>,
 }
 
 impl Display for FixMessage {
@@ -110,7 +107,7 @@ impl FixMessage {
 		};
 		let header = FixHeader::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num);
 		let trailer = FixTrailer::default();
-		Self { header, body, trailer, serialized_body_and_trailer: None }
+		Self { header, body, trailer }
 	}
 
 	/// Check if the message is valid
@@ -118,25 +115,18 @@ impl FixMessage {
 		self.validate().is_ok()
 	}
 
-	///
+	/// Write the complete message to a string
 	pub fn write_message(&self) -> String {
 		let mut buf = String::with_capacity(256); // Single allocation
-
 		self.header.write_to(&mut buf);
 		self.body.write_to(&mut buf);
 		self.trailer.write_to(&mut buf);
-
 		buf
 	}
 
 	/// Serialize the complete message to FIX wire format
 	pub fn to_fix_string(&self) -> String {
-		if let Some(body_and_trailer) = &self.serialized_body_and_trailer {
-			return body_and_trailer.to_owned();
-		}
-		let body_and_trailer = self.write_message();
-
-		body_and_trailer
+		self.write_message()
 	}
 
 	/// Parse a FIX message from wire format

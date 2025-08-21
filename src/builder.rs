@@ -6,9 +6,10 @@
 
 use crate::{
 	FixMessage,
-	common::{EncryptMethod, FixHeader, FixTrailer, MsgType, Side},
+	common::{EncryptMethod, FixHeader, FixTrailer, MsgType, Side, validation::WriteTo},
 	messages::{FixMessageBody, HeartbeatBody, LogonBody},
 };
+
 use time::OffsetDateTime;
 
 /// Builder for constructing FIX messages with a fluent API
@@ -34,7 +35,7 @@ impl FixMessageBuilder {
 		let header = FixHeader::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num);
 		let trailer = FixTrailer::default();
 
-		Self { message: FixMessage { header, body, trailer, serialized_body_and_trailer: None } }
+		Self { message: FixMessage { header, body, trailer } }
 	}
 
 	/// Create a builder from an existing message
@@ -194,16 +195,22 @@ impl FixMessageBuilder {
 
 	/// Build the final message with calculated body length and checksum
 	pub fn build(mut self) -> FixMessage {
-		let body_and_trailer = self.message.write_message();
-		let body_length = body_and_trailer.len() as u32;
+		// Calculate body length: everything after tag 9 (BodyLength) up to but not including tag 10 (Checksum)
+		// This includes the remaining header fields + message body + trailer fields (except checksum)
+		let mut body_content = String::with_capacity(256);
 
-		// Build message_without_checksum for checksum
-		// TODO: This is garbage. We should properly do everything in one pass, using the new WriteTo trait.
-		let checksum: u32 = body_and_trailer.bytes().map(|b| b as u32).sum::<u32>() % 256;
+		// Use WriteTo trait methods for proper encapsulation
+		self.message.header.write_body_fields(&mut body_content);
+		self.message.body.write_to(&mut body_content);
+		self.message.trailer.write_body_fields(&mut body_content);
 
+		// Calculate body length and checksum
+		let body_length = body_content.len() as u32;
+		let checksum: u32 = body_content.bytes().map(|b| b as u32).sum::<u32>() % 256;
+
+		// Set calculated values
 		self.message.header.body_length = body_length;
 		self.message.trailer.checksum = format!("{:03}", checksum);
-		self.message.serialized_body_and_trailer = Some(body_and_trailer); // Cache it
 
 		self.message
 	}
@@ -311,7 +318,9 @@ mod tests {
 		assert!(message.trailer.checksum.chars().all(|c| c.is_ascii_digit()));
 
 		// Verify calculated values are correct
-		// TODO: Check if the Logon message we build has actually a length of 67.
+		// Body length should include everything after tag 9 up to but not including tag 10
+		// This includes: MsgType(35), SenderCompID(49), TargetCompID(56), MsgSeqNum(34),
+		// SendingTime(52), EncryptMethod(98), HeartBtInt(108) with their delimiters
 		let expected_body_length = 67;
 
 		assert_eq!(message.header.body_length, expected_body_length);
@@ -332,5 +341,60 @@ mod tests {
 
 		// The message should be created but invalid
 		assert!(!potentially_invalid.is_valid());
+	}
+
+	#[test]
+	fn test_improved_body_length_calculation() {
+		// Create a comprehensive message with multiple fields to test body length calculation
+		let message = FixMessageBuilder::new(MsgType::Logon, "CLIENT", "BROKER", 42)
+			.encrypt_method(EncryptMethod::None)
+			.heart_bt_int(30)
+			.reset_seq_num_flag(true)
+			.next_expected_msg_seq_num(1)
+			.max_message_size(8192)
+			.poss_dup_flag(true)
+			.build();
+
+		// Verify that body length calculation is correct
+		assert!(message.header.body_length > 0);
+
+		// Parse the generated FIX string to verify it's properly formatted
+		let fix_string = message.to_fix_string();
+		let parsed = FixMessage::from_fix_string(&fix_string).expect("Should parse successfully");
+
+		// Verify that the parsed message has the same body length
+		assert_eq!(parsed.header.body_length, message.header.body_length);
+
+		// Verify that checksum is properly calculated
+		assert_eq!(message.trailer.checksum.len(), 3);
+		assert!(message.trailer.checksum.chars().all(|c| c.is_ascii_digit()));
+
+		// Verify the message is valid
+		assert!(message.is_valid());
+		assert!(parsed.is_valid());
+
+		// Test that body length excludes BeginString and BodyLength fields, and excludes Checksum
+		// The body should include everything from MsgType onwards until before Checksum
+		let fix_parts: Vec<&str> = fix_string.split('\x01').filter(|s| !s.is_empty()).collect();
+
+		// Find the body content (everything after BodyLength field until before Checksum)
+		let mut body_start_idx = None;
+		let mut checksum_idx = None;
+
+		for (i, part) in fix_parts.iter().enumerate() {
+			if part.starts_with("9=") {
+				body_start_idx = Some(i + 1); // Start after BodyLength field
+			}
+			if part.starts_with("10=") {
+				checksum_idx = Some(i); // Stop before Checksum field
+				break;
+			}
+		}
+
+		if let (Some(start), Some(end)) = (body_start_idx, checksum_idx) {
+			let body_parts = &fix_parts[start..end];
+			let body_content = body_parts.join("\x01") + "\x01"; // Add final delimiter
+			assert_eq!(body_content.len() as u32, message.header.body_length);
+		}
 	}
 }

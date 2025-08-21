@@ -27,15 +27,24 @@ impl Validate for FixTrailer {
 	}
 }
 
-impl WriteTo for FixTrailer {
-	fn write_to(&self, buffer: &mut String) {
-		// Optional trailer fields
+impl FixTrailer {
+	/// Write only the non-checksum fields for body length calculation
+	/// This includes optional fields like SignatureLength and Signature
+	pub fn write_body_fields(&self, buffer: &mut String) {
 		if let Some(sig_len) = self.signature_length {
 			write!(buffer, "93={}{}", sig_len, SOH).unwrap();
 		}
 		if let Some(ref signature) = self.signature {
 			write!(buffer, "89={}{}", signature, SOH).unwrap();
 		}
+	}
+}
+
+impl WriteTo for FixTrailer {
+	fn write_to(&self, buffer: &mut String) {
+		// Optional trailer fields
+		self.write_body_fields(buffer);
+		// Checksum is always last
 		write!(buffer, "10={}{}", self.checksum, SOH).unwrap();
 	}
 }
