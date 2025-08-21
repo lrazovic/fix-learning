@@ -4,7 +4,10 @@
 //! session-level communication to maintain connection liveness and respond
 //! to test requests.
 
-use crate::common::{SOH, Validate, ValidationError, validation::WriteTo};
+use crate::common::{
+	SOH, Validate, ValidationError,
+	validation::{FixFieldHandler, WriteTo},
+};
 use std::fmt::Write;
 
 /// Heartbeat message body (Tag 35=0)
@@ -44,14 +47,21 @@ impl HeartbeatBody {
 	pub fn responding_to_test_request(test_req_id: impl Into<String>) -> Self {
 		Self { test_req_id: Some(test_req_id.into()) }
 	}
+}
 
-	/// Parse a heartbeat-specific field
-	pub(crate) fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
+impl FixFieldHandler for HeartbeatBody {
+	fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
 		match tag {
 			112 => self.test_req_id = Some(value.to_string()),
 			_ => return Err(format!("Unknown heartbeat field: {}", tag)),
 		}
 		Ok(())
+	}
+
+	fn write_body_fields(&self, buffer: &mut String) {
+		// For heartbeat, write_body_fields is the same as write_to
+		// since all heartbeat fields contribute to body length
+		self.write_to(buffer);
 	}
 }
 

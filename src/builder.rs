@@ -6,7 +6,10 @@
 
 use crate::{
 	FixMessage,
-	common::{EncryptMethod, FixHeader, FixTrailer, MsgType, Side, validation::WriteTo},
+	common::{
+		EncryptMethod, FixHeader, FixTrailer, MsgType, Side,
+		validation::{FixFieldHandler, WriteTo},
+	},
 	messages::{FixMessageBody, HeartbeatBody, LogonBody},
 };
 

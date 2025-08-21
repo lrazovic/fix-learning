@@ -7,7 +7,7 @@ use crate::{
 	FORMAT_TIME, SOH,
 	common::{
 		enums::MsgType,
-		validation::{Validate, ValidationError, WriteTo},
+		validation::{FixFieldHandler, Validate, ValidationError, WriteTo},
 	},
 };
 use std::fmt::Write;
@@ -52,33 +52,46 @@ impl FixHeader {
 			orig_sending_time: None,
 		}
 	}
+}
 
-	/// Write only the fields that come after BodyLength (tag 9) for body length calculation
-	/// This includes MsgType, SenderCompID, TargetCompID, MsgSeqNum, SendingTime and optional fields
-	pub fn write_body_fields(&self, buffer: &mut String) {
-		write!(buffer, "35={}{}", self.msg_type, SOH).unwrap();
-		write!(buffer, "49={}{}", self.sender_comp_id, SOH).unwrap();
-		write!(buffer, "56={}{}", self.target_comp_id, SOH).unwrap();
-		write!(buffer, "34={}{}", self.msg_seq_num, SOH).unwrap();
-		write!(buffer, "52={}{}", self.sending_time.format(&FORMAT_TIME).unwrap(), SOH).unwrap();
-		if let Some(ref poss_dup_flag) = self.poss_dup_flag {
-			write!(buffer, "43={}{}", poss_dup_flag, SOH).unwrap();
+impl Validate for FixHeader {
+	fn validate(&self) -> Result<(), ValidationError> {
+		if self.begin_string != "FIX.4.2" {
+			return Err(ValidationError::VersionMismatch);
 		}
-		if let Some(ref poss_resend) = self.poss_resend {
-			write!(buffer, "97={}{}", poss_resend, SOH).unwrap();
+		if self.sender_comp_id.is_empty() {
+			return Err(ValidationError::EmptyMessage);
 		}
-		if let Some(ref orig_sending_time) = self.orig_sending_time {
-			write!(buffer, "122={}{}", orig_sending_time.format(&FORMAT_TIME).unwrap(), SOH).unwrap();
+		if self.target_comp_id.is_empty() {
+			return Err(ValidationError::EmptyMessage);
 		}
+		if self.msg_seq_num == 0 {
+			return Err(ValidationError::EmptyMessage);
+		}
+		if self.sending_time.year() < 1970 {
+			return Err(ValidationError::EmptyMessage);
+		}
+		Ok(())
 	}
+}
 
-	/// Parse a field from tag-value pair into the header
-	pub fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
+impl WriteTo for FixHeader {
+	fn write_to(&self, buffer: &mut String) {
+		write!(buffer, "8={}{}", self.begin_string, SOH).unwrap();
+		write!(buffer, "9={}{}", self.body_length, SOH).unwrap();
+		self.write_body_fields(buffer);
+	}
+}
+
+impl FixFieldHandler for FixHeader {
+	fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
 		match tag {
-			8 =>
+			8 => {
 				if value != "FIX.4.2" {
 					return Err(format!("Unsupported FIX version: {}", value));
-				},
+				}
+				// begin_string is already set as constant
+			},
 			9 => {
 				self.body_length = value.parse().map_err(|_| "Invalid BodyLength")?;
 			},
@@ -111,34 +124,22 @@ impl FixHeader {
 		}
 		Ok(())
 	}
-}
 
-impl Validate for FixHeader {
-	fn validate(&self) -> Result<(), ValidationError> {
-		if self.begin_string != "FIX.4.2" {
-			return Err(ValidationError::VersionMismatch);
+	fn write_body_fields(&self, buffer: &mut String) {
+		write!(buffer, "35={}{}", self.msg_type, SOH).unwrap();
+		write!(buffer, "49={}{}", self.sender_comp_id, SOH).unwrap();
+		write!(buffer, "56={}{}", self.target_comp_id, SOH).unwrap();
+		write!(buffer, "34={}{}", self.msg_seq_num, SOH).unwrap();
+		write!(buffer, "52={}{}", self.sending_time.format(&FORMAT_TIME).unwrap(), SOH).unwrap();
+		if let Some(ref poss_dup_flag) = self.poss_dup_flag {
+			write!(buffer, "43={}{}", poss_dup_flag, SOH).unwrap();
 		}
-		if self.sender_comp_id.is_empty() {
-			return Err(ValidationError::EmptyMessage);
+		if let Some(ref poss_resend) = self.poss_resend {
+			write!(buffer, "97={}{}", poss_resend, SOH).unwrap();
 		}
-		if self.target_comp_id.is_empty() {
-			return Err(ValidationError::EmptyMessage);
+		if let Some(ref orig_sending_time) = self.orig_sending_time {
+			write!(buffer, "122={}{}", orig_sending_time.format(&FORMAT_TIME).unwrap(), SOH).unwrap();
 		}
-		if self.msg_seq_num == 0 {
-			return Err(ValidationError::EmptyMessage);
-		}
-		if self.sending_time.year() < 1970 {
-			return Err(ValidationError::EmptyMessage);
-		}
-		Ok(())
-	}
-}
-
-impl WriteTo for FixHeader {
-	fn write_to(&self, buffer: &mut String) {
-		write!(buffer, "8={}{}", self.begin_string, SOH).unwrap();
-		write!(buffer, "9={}{}", self.body_length, SOH).unwrap();
-		self.write_body_fields(buffer);
 	}
 }
 

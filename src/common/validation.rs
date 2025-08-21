@@ -84,3 +84,29 @@ pub trait Validate {
 pub trait WriteTo {
 	fn write_to(&self, buffer: &mut String);
 }
+
+/// Trait for handling FIX field operations
+///
+/// This trait provides a unified interface for parsing fields from tag-value pairs
+/// and writing fields that contribute to the body length calculation.
+pub trait FixFieldHandler {
+	/// Parse a field from a tag-value pair
+	///
+	/// # Arguments
+	/// * `tag` - The FIX tag number
+	/// * `value` - The field value as a string
+	///
+	/// # Returns
+	/// * `Ok(())` if the field was successfully parsed
+	/// * `Err(String)` if the field is unknown or invalid
+	fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String>;
+
+	/// Write only the fields that contribute to body length calculation
+	///
+	/// This excludes fields like BeginString, BodyLength, and Checksum that
+	/// are not included in the FIX body length calculation.
+	///
+	/// # Arguments
+	/// * `buffer` - The string buffer to write to
+	fn write_body_fields(&self, buffer: &mut String);
+}

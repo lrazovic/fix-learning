@@ -6,7 +6,10 @@
 
 use crate::{
 	FORMAT_TIME, SOH, Side,
-	common::{Validate, ValidationError, validation::WriteTo},
+	common::{
+		Validate, ValidationError,
+		validation::{FixFieldHandler, WriteTo},
+	},
 };
 use std::fmt::Write;
 use time::OffsetDateTime;
@@ -84,9 +87,10 @@ impl NewOrderSingleBody {
 			security_exchange: None,
 		}
 	}
+}
 
-	/// Parse a heartbeat-specific field
-	pub(crate) fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
+impl FixFieldHandler for NewOrderSingleBody {
+	fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
 		match tag {
 			11 => self.cl_ord_id = value.to_string(),
 			21 => self.handl_inst = value.to_string(),
@@ -96,8 +100,14 @@ impl NewOrderSingleBody {
 			40 => self.ord_type = value.to_string(),
 			207 => self.security_exchange = Some(value.to_string()),
 			44 => self.price = Some(value.parse().map_err(|_| "Invalid price")?),
-			_ => return Err(format!("Unknown heartbeat field: {}", tag)),
+			_ => return Err(format!("Unknown new order single field: {}", tag)),
 		}
 		Ok(())
+	}
+
+	fn write_body_fields(&self, buffer: &mut String) {
+		// For new order single, write_body_fields is the same as write_to
+		// since all order fields contribute to body length
+		self.write_to(buffer);
 	}
 }

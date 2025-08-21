@@ -4,7 +4,10 @@
 //! initiate a FIX session between two counterparties. The Logon message
 //! establishes session parameters and authentication.
 
-use crate::common::{EncryptMethod, SOH, Validate, ValidationError, validation::WriteTo};
+use crate::common::{
+	EncryptMethod, SOH, Validate, ValidationError,
+	validation::{FixFieldHandler, WriteTo},
+};
 use std::fmt::Write;
 
 /// Logon message body (Tag 35=A)
@@ -86,9 +89,10 @@ impl LogonBody {
 		self.max_message_size = Some(size);
 		self
 	}
+}
 
-	/// Parse a logon-specific field
-	pub(crate) fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
+impl FixFieldHandler for LogonBody {
+	fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
 		match tag {
 			98 => {
 				self.encrypt_method = value.parse().map_err(|_| "Invalid EncryptMethod")?;
@@ -108,6 +112,12 @@ impl LogonBody {
 			_ => return Err(format!("Unknown logon field: {}", tag)),
 		}
 		Ok(())
+	}
+
+	fn write_body_fields(&self, buffer: &mut String) {
+		// For logon, write_body_fields is the same as write_to
+		// since all logon fields contribute to body length
+		self.write_to(buffer);
 	}
 }
 

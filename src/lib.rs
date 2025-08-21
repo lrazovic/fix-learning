@@ -56,7 +56,7 @@ pub use common::{
 };
 pub use messages::{FixMessageBody, HeartbeatBody, LogonBody};
 
-use crate::common::validation::WriteTo;
+use crate::common::validation::{FixFieldHandler, WriteTo};
 
 /// Main FIX 4.2 Message structure
 ///

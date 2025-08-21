@@ -5,7 +5,7 @@
 
 use crate::{
 	SOH,
-	common::validation::{Validate, ValidationError, WriteTo},
+	common::validation::{FixFieldHandler, Validate, ValidationError, WriteTo},
 };
 use std::fmt::Write;
 
@@ -27,20 +27,8 @@ impl Validate for FixTrailer {
 	}
 }
 
-impl FixTrailer {
-	/// Write only the non-checksum fields for body length calculation
-	/// This includes optional fields like SignatureLength and Signature
-	pub fn write_body_fields(&self, buffer: &mut String) {
-		if let Some(sig_len) = self.signature_length {
-			write!(buffer, "93={}{}", sig_len, SOH).unwrap();
-		}
-		if let Some(ref signature) = self.signature {
-			write!(buffer, "89={}{}", signature, SOH).unwrap();
-		}
-	}
-
-	/// Parse a field from tag-value pair into the trailer
-	pub fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
+impl FixFieldHandler for FixTrailer {
+	fn parse_field(&mut self, tag: u32, value: &str) -> Result<(), String> {
 		match tag {
 			10 => {
 				self.checksum = value.to_string();
@@ -54,6 +42,15 @@ impl FixTrailer {
 			_ => return Err(format!("Unknown trailer field: {}", tag)),
 		}
 		Ok(())
+	}
+
+	fn write_body_fields(&self, buffer: &mut String) {
+		if let Some(sig_len) = self.signature_length {
+			write!(buffer, "93={}{}", sig_len, SOH).unwrap();
+		}
+		if let Some(ref signature) = self.signature {
+			write!(buffer, "89={}{}", signature, SOH).unwrap();
+		}
 	}
 }
 
