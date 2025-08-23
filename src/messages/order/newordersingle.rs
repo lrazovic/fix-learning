@@ -7,7 +7,7 @@
 use crate::{
 	FORMAT_TIME, SOH, Side,
 	common::{
-		Validate, ValidationError,
+		Validate, ValidationError, parse_fix_timestamp,
 		validation::{FixFieldHandler, WriteTo},
 	},
 };
@@ -56,6 +56,12 @@ impl WriteTo for NewOrderSingleBody {
 		write!(buffer, "54={}{}", self.side, SOH).unwrap();
 		write!(buffer, "60={}{}", self.transact_time.format(FORMAT_TIME).unwrap(), SOH).unwrap();
 		write!(buffer, "40={}{}", self.ord_type, SOH).unwrap();
+		if let Some(order_qty) = self.order_qty {
+			write!(buffer, "38={}{}", order_qty, SOH).unwrap();
+		}
+		if let Some(cash_order_qty) = self.cash_order_qty {
+			write!(buffer, "152={}{}", cash_order_qty, SOH).unwrap();
+		}
 		if let Some(security_exchange) = &self.security_exchange {
 			write!(buffer, "207={}{}", security_exchange, SOH).unwrap();
 		}
@@ -96,7 +102,8 @@ impl FixFieldHandler for NewOrderSingleBody {
 			21 => self.handl_inst = value.to_string(),
 			55 => self.symbol = value.to_string(),
 			54 => self.side = value.parse().map_err(|_| "Invalid side")?,
-			60 => self.transact_time = OffsetDateTime::parse(value, FORMAT_TIME).map_err(|_| "Invalid time format")?,
+			60 => self.transact_time = parse_fix_timestamp(value)?,
+			38 => self.order_qty = Some(value.parse().map_err(|_| "Invalid order quantity")?),
 			40 => self.ord_type = value.to_string(),
 			207 => self.security_exchange = Some(value.to_string()),
 			44 => self.price = Some(value.parse().map_err(|_| "Invalid price")?),

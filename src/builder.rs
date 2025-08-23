@@ -10,7 +10,7 @@ use crate::{
 		EncryptMethod, FixHeader, FixTrailer, MsgType, Side,
 		validation::{FixFieldHandler, WriteTo},
 	},
-	messages::{FixMessageBody, HeartbeatBody, LogonBody},
+	messages::{FixMessageBody, HeartbeatBody, LogonBody, NewOrderSingleBody},
 };
 
 use time::OffsetDateTime;
@@ -32,6 +32,7 @@ impl FixMessageBuilder {
 		let body = match msg_type {
 			MsgType::Heartbeat => FixMessageBody::Heartbeat(HeartbeatBody::default()),
 			MsgType::Logon => FixMessageBody::Logon(LogonBody::default()),
+			MsgType::NewOrderSingle => FixMessageBody::NewOrderSingle(NewOrderSingleBody::default()),
 			_ => FixMessageBody::Other,
 		};
 

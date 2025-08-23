@@ -54,7 +54,7 @@ pub use common::{
 	EncryptMethod, FORMAT_TIME, FixHeader, FixTrailer, MsgType, OrdStatus, SOH, Side, Validate, ValidationError,
 	parse_fix_timestamp,
 };
-pub use messages::{FixMessageBody, HeartbeatBody, LogonBody};
+pub use messages::{FixMessageBody, HeartbeatBody, LogonBody, NewOrderSingleBody};
 
 use crate::common::validation::{FixFieldHandler, WriteTo};
 
@@ -103,6 +103,7 @@ impl FixMessage {
 		let body = match msg_type {
 			MsgType::Heartbeat => FixMessageBody::Heartbeat(HeartbeatBody::default()),
 			MsgType::Logon => FixMessageBody::Logon(LogonBody::default()),
+			MsgType::NewOrderSingle => FixMessageBody::NewOrderSingle(NewOrderSingleBody::default()),
 			_ => FixMessageBody::Other,
 		};
 		let header = FixHeader::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num);
