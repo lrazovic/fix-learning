@@ -238,7 +238,7 @@ This project is for educational purposes in learning the FIX protocol and Rust d
 
 
 ## Things to improve:
-- [] The time formatter is too slow.
+- [X] The time formatter is too slow.
 - [] I don't like that we have to unwrap every time we write to a buffer. Probably we can do better - `write!(buffer, "98={}{}", self.encrypt_method, SOH).unwrap()`
 - [] We can probably have a ProcMacro to automatically derive WriteTo and Validate.
 - [] The Tags go from 1 to 446. Probably we can have them in an Enum, or something similar. I don't like that if we add a new item to the body of the message, then we have to remeber to update all the various methods to include this new tag.
