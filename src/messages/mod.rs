@@ -13,7 +13,7 @@ use crate::common::{
 };
 
 // Re-export message body types
-pub use order::NewOrderSingleBody;
+pub use order::{ExecutionReportBody, NewOrderSingleBody, OrderCancelRequestBody};
 pub use session::{HeartbeatBody, LogonBody};
 
 /// Message-specific body that only allocates fields needed for each message type
@@ -29,6 +29,10 @@ pub enum FixMessageBody {
 	Logon(LogonBody),
 	/// New Order Single message body (MsgType=D)
 	NewOrderSingle(NewOrderSingleBody),
+	/// Execution Report message body (MsgType=8)
+	ExecutionReport(ExecutionReportBody),
+	/// Order Cancel Request message body (MsgType=F)
+	OrderCancelRequest(OrderCancelRequestBody),
 	/// Placeholder for other message types not yet implemented with specific bodies
 	Other,
 }
@@ -39,6 +43,8 @@ impl Validate for FixMessageBody {
 			Self::Heartbeat(body) => body.validate(),
 			Self::Logon(body) => body.validate(),
 			Self::NewOrderSingle(body) => body.validate(),
+			Self::ExecutionReport(body) => body.validate(),
+			Self::OrderCancelRequest(body) => body.validate(),
 			Self::Other => Ok(()), // No validation for unsupported types yet
 		}
 	}
@@ -50,6 +56,8 @@ impl WriteTo for FixMessageBody {
 			Self::Heartbeat(body) => body.write_to(buffer),
 			Self::Logon(body) => body.write_to(buffer),
 			Self::NewOrderSingle(body) => body.write_to(buffer),
+			Self::ExecutionReport(body) => body.write_to(buffer),
+			Self::OrderCancelRequest(body) => body.write_to(buffer),
 			Self::Other => unimplemented!(),
 		}
 	}
@@ -61,6 +69,8 @@ impl FixFieldHandler for FixMessageBody {
 			Self::Heartbeat(body) => body.parse_field(tag, value),
 			Self::Logon(body) => body.parse_field(tag, value),
 			Self::NewOrderSingle(body) => body.parse_field(tag, value),
+			Self::ExecutionReport(body) => body.parse_field(tag, value),
+			Self::OrderCancelRequest(body) => body.parse_field(tag, value),
 			Self::Other => Ok(()), // Ignore fields for unsupported types
 		}
 	}

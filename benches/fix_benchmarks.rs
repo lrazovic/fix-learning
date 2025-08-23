@@ -1,6 +1,6 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use fix_learning::{FixMessage, MsgType, OrdStatus, Side};
-use std::{hint::black_box, str::FromStr};
+use std::hint::black_box;
 use time::macros::datetime;
 
 // Sample FIX message data for benchmarks
@@ -30,41 +30,29 @@ fn create_sample_messages() -> Vec<FixMessage> {
 			.order_qty(100.0)
 			.security_exchange("TO")
 			.build(),
-		// // Execution Report
-		// FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 100)
-		// 	.order_id("ORDER001")
-		// 	.cl_ord_id("CLIENT001")
-		// 	.exec_id("EXEC001")
-		// 	.exec_type("F")
-		// 	.ord_status(OrdStatus::Filled)
-		// 	.symbol("MSFT")
-		// 	.side(Side::Buy)
-		// 	.order_qty(500.0)
-		// 	.last_px(155.75)
-		// 	.last_qty(500.0)
-		// 	.cum_qty(500.0)
-		// 	.leaves_qty(0.0)
-		// 	.avg_px(155.75)
-		// 	.build(),
-		// // Order Cancel Request
-		// FixMessage::builder(MsgType::OrderCancelRequest, "CLIENT", "BROKER", 50)
-		// 	.order_id("ORDER001")
-		// 	.cl_ord_id("CANCEL001")
-		// 	.symbol("GOOGL")
-		// 	.side(Side::Sell)
-		// 	.order_qty(100.0)
-		// 	.build(),
-		// // Market Data Request
-		// FixMessage::builder(MsgType::MarketDataRequest, "CLIENT", "MARKET", 25)
-		// 	.field(262, "MDREQ001") // MDReqID
-		// 	.field(263, "1") // SubscriptionRequestType
-		// 	.field(264, "20") // MarketDepth
-		// 	.field(267, "2") // NoMDEntryTypes
-		// 	.field(269, "0") // MDEntryType - Bid
-		// 	.field(269, "1") // MDEntryType - Offer
-		// 	.field(146, "1") // NoRelatedSym
-		// 	.symbol("AAPL")
-		// 	.build(),
+		// Execution Report
+		FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 100)
+			.order_id("ORDER001")
+			.cl_ord_id("CLIENT001")
+			.exec_id("EXEC001")
+			.exec_type("F")
+			.ord_status(OrdStatus::Filled)
+			.symbol("MSFT")
+			.side(Side::Buy)
+			.order_qty(500.0)
+			.last_px(155.75)
+			.cum_qty(500.0)
+			.leaves_qty(0.0)
+			.avg_px(155.75)
+			.build(),
+		// Order Cancel Request
+		FixMessage::builder(MsgType::OrderCancelRequest, "CLIENT", "BROKER", 50)
+			.order_id("ORDER001")
+			.cl_ord_id("CANCEL001")
+			.symbol("GOOGL")
+			.side(Side::Sell)
+			.order_qty(100.0)
+			.build(),
 	]
 }
 
@@ -125,32 +113,31 @@ fn bench_message_creation(c: &mut Criterion) {
 		})
 	});
 
-	// group.bench_function("execution_report", |b| {
-	// 	b.iter(|| {
-	// 		black_box(
-	// 			FixMessage::builder(
-	// 				black_box(MsgType::ExecutionReport),
-	// 				black_box("BROKER"),
-	// 				black_box("CLIENT"),
-	// 				black_box(100),
-	// 			)
-	// 			.order_id(black_box("ORDER001"))
-	// 			.cl_ord_id(black_box("CLIENT001"))
-	// 			.exec_id(black_box("EXEC001"))
-	// 			.exec_type(black_box("F"))
-	// 			.ord_status(black_box(OrdStatus::Filled))
-	// 			.symbol(black_box("MSFT"))
-	// 			.side(black_box(Side::Buy))
-	// 			.order_qty(black_box(500.0))
-	// 			.last_px(black_box(155.75))
-	// 			.last_qty(black_box(500.0))
-	// 			.cum_qty(black_box(500.0))
-	// 			.leaves_qty(black_box(0.0))
-	// 			.avg_px(black_box(155.75))
-	// 			.build(),
-	// 		)
-	// 	})
-	// });
+	group.bench_function("execution_report", |b| {
+		b.iter(|| {
+			black_box(
+				FixMessage::builder(
+					black_box(MsgType::ExecutionReport),
+					black_box("BROKER"),
+					black_box("CLIENT"),
+					black_box(100),
+				)
+				.order_id(black_box("ORDER001"))
+				.cl_ord_id(black_box("CLIENT001"))
+				.exec_id(black_box("EXEC001"))
+				.exec_type(black_box("F"))
+				.ord_status(black_box(OrdStatus::Filled))
+				.symbol(black_box("MSFT"))
+				.side(black_box(Side::Buy))
+				.order_qty(black_box(500.0))
+				.last_px(black_box(155.75))
+				.cum_qty(black_box(500.0))
+				.leaves_qty(black_box(0.0))
+				.avg_px(black_box(155.75))
+				.build(),
+			)
+		})
+	});
 
 	group.finish();
 }
@@ -199,41 +186,6 @@ fn bench_round_trip(c: &mut Criterion) {
 	group.finish();
 }
 
-// Benchmark enum parsing performance
-fn bench_enum_parsing(c: &mut Criterion) {
-	let mut group = c.benchmark_group("enum_parsing");
-
-	let msg_types = ["0", "1", "D", "8", "F", "G", "V", "W"];
-	let sides = ["1", "2"];
-	let ord_statuses = ["0", "1", "2", "4", "8"];
-
-	group.bench_function("msg_type_parsing", |b| {
-		b.iter(|| {
-			for msg_type_str in &msg_types {
-				let _ = black_box(MsgType::from_str(black_box(msg_type_str)));
-			}
-		})
-	});
-
-	group.bench_function("side_parsing", |b| {
-		b.iter(|| {
-			for side_str in &sides {
-				let _ = black_box(Side::from_str(black_box(side_str)));
-			}
-		})
-	});
-
-	group.bench_function("ord_status_parsing", |b| {
-		b.iter(|| {
-			for status_str in &ord_statuses {
-				let _ = black_box(OrdStatus::from_str(black_box(status_str)));
-			}
-		})
-	});
-
-	group.finish();
-}
-
 // Benchmark field access and manipulation
 fn bench_field_operations(c: &mut Criterion) {
 	let mut group = c.benchmark_group("field_operations");
@@ -271,37 +223,37 @@ fn bench_message_sizes(c: &mut Criterion) {
 		.price(150.25)
 		.build();
 
-	// // Large message (with many custom fields)
-	// let mut large_msg = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 100)
-	// 	.order_id("ORDER001")
-	// 	.cl_ord_id("CLIENT001")
-	// 	.exec_id("EXEC001")
-	// 	.exec_type("F")
-	// 	.ord_status(OrdStatus::Filled)
-	// 	.symbol("MSFT")
-	// 	.side(Side::Buy)
-	// 	.order_qty(500.0)
-	// 	.last_px(155.75)
-	// 	.last_qty(500.0)
-	// 	.cum_qty(500.0)
-	// 	.leaves_qty(0.0)
-	// 	.avg_px(155.75)
-	// 	.build();
+	// Large message (with many custom fields)
+	let large_msg_builder = FixMessage::builder(MsgType::ExecutionReport, "BROKER", "CLIENT", 100)
+		.order_id("ORDER001")
+		.cl_ord_id("CLIENT001")
+		.exec_id("EXEC001")
+		.exec_type("F")
+		.ord_status(OrdStatus::Filled)
+		.symbol("MSFT")
+		.side(Side::Buy)
+		.order_qty(500.0)
+		.last_px(155.75)
+		.cum_qty(500.0)
+		.leaves_qty(0.0)
+		.avg_px(155.75);
 
-	// // Add many custom fields to make it large
+	// Add many custom fields to make it large
 	// for i in 5000..5050 {
-	// 	large_msg.set_field(i, format!("CUSTOM_FIELD_{}", i));
+	// 	large_msg_builder.set_field(i, format!("CUSTOM_FIELD_{}", i));
 	// }
+
+	let large_msg = large_msg_builder.build();
 
 	group.bench_function("small_message_serialization", |b| b.iter(|| black_box(small_msg.to_fix_string())));
 
 	group.bench_function("medium_message_serialization", |b| b.iter(|| black_box(medium_msg.to_fix_string())));
 
-	// group.bench_function("large_message_serialization", |b| b.iter(|| black_box(large_msg.to_fix_string())));
+	group.bench_function("large_message_serialization", |b| b.iter(|| black_box(large_msg.to_fix_string())));
 
 	let small_fix = small_msg.to_fix_string();
 	let medium_fix = medium_msg.to_fix_string();
-	// let large_fix = large_msg.to_fix_string();
+	let large_fix = large_msg.to_fix_string();
 
 	group.bench_function("small_message_parsing", |b| {
 		b.iter(|| black_box(FixMessage::from_fix_string(black_box(&small_fix))))
@@ -311,9 +263,9 @@ fn bench_message_sizes(c: &mut Criterion) {
 		b.iter(|| black_box(FixMessage::from_fix_string(black_box(&medium_fix))))
 	});
 
-	// group.bench_function("large_message_parsing", |b| {
-	// 	b.iter(|| black_box(FixMessage::from_fix_string(black_box(&large_fix))))
-	// });
+	group.bench_function("large_message_parsing", |b| {
+		b.iter(|| black_box(FixMessage::from_fix_string(black_box(&large_fix))))
+	});
 
 	group.finish();
 }
@@ -375,7 +327,6 @@ criterion_group!(
 	bench_serialization,
 	bench_parsing,
 	bench_round_trip,
-	bench_enum_parsing,
 	bench_field_operations,
 	bench_message_sizes,
 	bench_memory_patterns

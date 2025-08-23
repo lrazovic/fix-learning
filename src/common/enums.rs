@@ -41,6 +41,37 @@ fix_enum!(Strict OrdStatus {
 	PendingReplace     => "E",
 });
 
+// ExecType (Tag 150) extends OrdStatus semantics with additional values for trade events & restatements
+fix_enum!(Strict ExecType {
+	New             => "0",
+	PartialFill     => "1",
+	Fill            => "2",
+	DoneForDay      => "3",
+	Canceled        => "4",
+	Replaced        => "5",
+	PendingCancel   => "6",
+	Stopped         => "7",
+	Rejected        => "8",
+	Suspended       => "9",
+	PendingNew      => "A",
+	Calculated      => "B",
+	Expired         => "C",
+	Restated        => "D",
+	PendingReplace  => "E",
+	Trade           => "F", // (partial fill or fill)
+	TradeCorrect    => "G",
+	TradeCancel     => "H",
+	OrderStatus     => "I",
+});
+
+// ExecTransType (Tag 20)
+fix_enum!(Strict ExecTransType {
+	New     => "0",
+	Cancel  => "1",
+	Correct => "2",
+	Status  => "3",
+});
+
 // FIX 4.2 Encryption Methods for Logon messages
 fix_enum!(Strict EncryptMethod {
 	None => "0",

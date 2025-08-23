@@ -53,7 +53,9 @@ pub use builder::FixMessageBuilder;
 pub use common::{
 	EncryptMethod, FixHeader, FixTrailer, MsgType, OrdStatus, SOH, Side, Validate, ValidationError, parse_fix_timestamp,
 };
-pub use messages::{FixMessageBody, HeartbeatBody, LogonBody, NewOrderSingleBody};
+pub use messages::{
+	ExecutionReportBody, FixMessageBody, HeartbeatBody, LogonBody, NewOrderSingleBody, OrderCancelRequestBody,
+};
 
 use crate::common::validation::{FixFieldHandler, WriteTo};
 
@@ -103,6 +105,8 @@ impl FixMessage {
 			MsgType::Heartbeat => FixMessageBody::Heartbeat(HeartbeatBody::default()),
 			MsgType::Logon => FixMessageBody::Logon(LogonBody::default()),
 			MsgType::NewOrderSingle => FixMessageBody::NewOrderSingle(NewOrderSingleBody::default()),
+			MsgType::ExecutionReport => FixMessageBody::ExecutionReport(ExecutionReportBody::default()),
+			MsgType::OrderCancelRequest => FixMessageBody::OrderCancelRequest(OrderCancelRequestBody::default()),
 			_ => FixMessageBody::Other,
 		};
 		let header = FixHeader::new(msg_type, sender_comp_id, target_comp_id, msg_seq_num);
