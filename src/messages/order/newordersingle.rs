@@ -5,10 +5,11 @@
 //! to test requests.
 
 use crate::{
-	FORMAT_TIME, SOH, Side,
+	SOH, Side,
 	common::{
 		Validate, ValidationError, parse_fix_timestamp,
 		validation::{FixFieldHandler, WriteTo},
+		write_tag_timestamp,
 	},
 };
 use std::fmt::Write;
@@ -54,7 +55,7 @@ impl WriteTo for NewOrderSingleBody {
 		write!(buffer, "21={}{}", self.handl_inst, SOH).unwrap();
 		write!(buffer, "55={}{}", self.symbol, SOH).unwrap();
 		write!(buffer, "54={}{}", self.side, SOH).unwrap();
-		write!(buffer, "60={}{}", self.transact_time.format(FORMAT_TIME).unwrap(), SOH).unwrap();
+		write_tag_timestamp(buffer, 60, self.transact_time);
 		write!(buffer, "40={}{}", self.ord_type, SOH).unwrap();
 		if let Some(order_qty) = self.order_qty {
 			write!(buffer, "38={}{}", order_qty, SOH).unwrap();

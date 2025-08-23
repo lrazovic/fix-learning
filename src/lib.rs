@@ -51,8 +51,7 @@ use std::{collections::HashMap, fmt::Display};
 // Re-export commonly used types
 pub use builder::FixMessageBuilder;
 pub use common::{
-	EncryptMethod, FORMAT_TIME, FixHeader, FixTrailer, MsgType, OrdStatus, SOH, Side, Validate, ValidationError,
-	parse_fix_timestamp,
+	EncryptMethod, FixHeader, FixTrailer, MsgType, OrdStatus, SOH, Side, Validate, ValidationError, parse_fix_timestamp,
 };
 pub use messages::{FixMessageBody, HeartbeatBody, LogonBody, NewOrderSingleBody};
 

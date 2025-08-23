@@ -4,14 +4,15 @@
 //! that is common to all FIX messages, along with its validation logic.
 
 use crate::{
-	FORMAT_TIME, SOH,
+	SOH,
 	common::{
 		enums::MsgType,
 		validation::{FixFieldHandler, Validate, ValidationError, WriteTo},
+		write_tag_timestamp,
 	},
 };
 use std::fmt::Write;
-use time::{Duration, OffsetDateTime, PrimitiveDateTime, UtcOffset, macros::format_description};
+use time::{Duration, OffsetDateTime};
 
 /// Standard FIX message header
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -130,7 +131,7 @@ impl FixFieldHandler for FixHeader {
 		write!(buffer, "49={}{}", self.sender_comp_id, SOH).unwrap();
 		write!(buffer, "56={}{}", self.target_comp_id, SOH).unwrap();
 		write!(buffer, "34={}{}", self.msg_seq_num, SOH).unwrap();
-		write!(buffer, "52={}{}", self.sending_time.format(&FORMAT_TIME).unwrap(), SOH).unwrap();
+		write_tag_timestamp(buffer, 52, self.sending_time);
 		if let Some(ref poss_dup_flag) = self.poss_dup_flag {
 			write!(buffer, "43={}{}", poss_dup_flag, SOH).unwrap();
 		}
@@ -138,27 +139,47 @@ impl FixFieldHandler for FixHeader {
 			write!(buffer, "97={}{}", poss_resend, SOH).unwrap();
 		}
 		if let Some(ref orig_sending_time) = self.orig_sending_time {
-			write!(buffer, "122={}{}", orig_sending_time.format(&FORMAT_TIME).unwrap(), SOH).unwrap();
+			write_tag_timestamp(buffer, 122, *orig_sending_time);
 		}
 	}
 }
 
 /// Time parsing utilities for FIX timestamps
 pub fn parse_fix_timestamp(s: &str) -> Result<OffsetDateTime, String> {
-	// Leap second handling
-	let (s, leap) = if s.contains(":60") { (s.replace(":60", ":59"), true) } else { (s.to_string(), false) };
+	// FIX timestamps are always: YYYYMMDD-HH:MM:SS[.sss]
+	if s.len() < 17 {
+		return Err(format!("Timestamp too short: {}", s));
+	}
 
-	let fmt_millis = FORMAT_TIME;
-	let fmt_seconds = format_description!("[year][month][day]-[hour]:[minute]:[second]");
+	// Just use parse() on each substring - it's cleaner than manual digit parsing
+	let year: i32 = s[0..4].parse().map_err(|_| format!("Invalid year: {}", s))?;
+	let month: u8 = s[4..6].parse().map_err(|_| format!("Invalid month: {}", s))?;
+	let day: u8 = s[6..8].parse().map_err(|_| format!("Invalid day: {}", s))?;
+	let hour: u8 = s[9..11].parse().map_err(|_| format!("Invalid hour: {}", s))?;
+	let minute: u8 = s[12..14].parse().map_err(|_| format!("Invalid minute: {}", s))?;
+	let second: u8 = s[15..17].parse().map_err(|_| format!("Invalid second: {}", s))?;
 
-	let parsed = PrimitiveDateTime::parse(&s, &fmt_millis)
-		.or_else(|_| PrimitiveDateTime::parse(&s, &fmt_seconds))
-		.map_err(|e| format!("Invalid timestamp '{}': {}", s, e))?;
+	let millisecond = if s.len() >= 21 && s.chars().nth(17) == Some('.') {
+		s[18..21].parse().map_err(|_| format!("Invalid milliseconds: {}", s))?
+	} else {
+		0
+	};
 
-	let mut dt = parsed.assume_offset(UtcOffset::UTC);
+	// Handle leap second
+	let (second, leap) = if second == 60 { (59, true) } else { (second, false) };
+
+	use time::{Date, Month, PrimitiveDateTime, Time};
+
+	let month = Month::try_from(month).map_err(|e| format!("Invalid month: {:?}", e))?;
+
+	let date = Date::from_calendar_date(year, month, day).map_err(|e| format!("Invalid date: {:?}", e))?;
+	let time = Time::from_hms_milli(hour, minute, second, millisecond).map_err(|e| format!("Invalid time: {:?}", e))?;
+
+	let mut dt = PrimitiveDateTime::new(date, time).assume_utc();
 	if leap {
 		dt += Duration::seconds(1);
 	}
+
 	Ok(dt)
 }
 

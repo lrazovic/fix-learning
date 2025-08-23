@@ -4,10 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-time = { version = "0.3", features = ["macros", "formatting", "parsing"] }
+itoa = "1.0.15"
+time = { version = "0.3", features = ["parsing"] }
 
 [dev-dependencies]
 criterion = { version = "0.7", features = ["html_reports"] }
+time = { version = "0.3", features = ["parsing", "macros"] }
 
 [[bench]]
 name = "fix_benchmarks"
