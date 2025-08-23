@@ -10,7 +10,9 @@ use crate::{
 		EncryptMethod, FixHeader, FixTrailer, MsgType, Side,
 		validation::{FixFieldHandler, WriteTo},
 	},
-	messages::{ExecutionReportBody, FixMessageBody, HeartbeatBody, LogonBody, NewOrderSingleBody},
+	messages::{
+		ExecutionReportBody, FixMessageBody, HeartbeatBody, LogonBody, NewOrderSingleBody, OrderCancelRequestBody,
+	},
 };
 
 use time::OffsetDateTime;
@@ -34,6 +36,7 @@ impl FixMessageBuilder {
 			MsgType::Logon => FixMessageBody::Logon(LogonBody::default()),
 			MsgType::NewOrderSingle => FixMessageBody::NewOrderSingle(NewOrderSingleBody::default()),
 			MsgType::ExecutionReport => FixMessageBody::ExecutionReport(ExecutionReportBody::default()),
+			MsgType::OrderCancelRequest => FixMessageBody::OrderCancelRequest(OrderCancelRequestBody::default()),
 			_ => FixMessageBody::Other,
 		};
 
@@ -215,56 +218,121 @@ impl FixMessageBuilder {
 
 	pub fn exec_trans_type(mut self, v: impl Into<String>) -> Self {
 		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
-			body.exec_trans_type = v.into().parse().unwrap_or(body.exec_trans_type.clone());
+			body.exec_trans_type = v.into().parse().unwrap_or_else(|_| body.exec_trans_type.clone());
 		}
 		self
 	}
 
 	pub fn exec_type(mut self, v: impl Into<String>) -> Self {
 		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
-			body.exec_type = v.into().parse().unwrap_or(body.exec_type.clone());
+			body.exec_type = v.into().parse().unwrap_or_else(|_| body.exec_type.clone());
 		}
 		self
 	}
 
-	pub fn ord_status(mut self, v: OrdStatus) -> Self {
+	pub const fn ord_status(mut self, v: OrdStatus) -> Self {
 		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
 			body.ord_status = v;
 		}
 		self
 	}
 
-	pub fn leaves_qty(mut self, qty: f64) -> Self {
+	pub const fn leaves_qty(mut self, qty: f64) -> Self {
 		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
 			body.leaves_qty = qty;
 		}
 		self
 	}
 
-	pub fn cum_qty(mut self, qty: f64) -> Self {
+	pub const fn cum_qty(mut self, qty: f64) -> Self {
 		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
 			body.cum_qty = qty;
 		}
 		self
 	}
 
-	pub fn avg_px(mut self, px: f64) -> Self {
+	pub const fn avg_px(mut self, px: f64) -> Self {
 		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
 			body.avg_px = px;
 		}
 		self
 	}
 
-	pub fn last_shares(mut self, qty: f64) -> Self {
+	pub const fn last_shares(mut self, qty: f64) -> Self {
 		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
 			body.last_shares = Some(qty);
 		}
 		self
 	}
 
-	pub fn last_px(mut self, px: f64) -> Self {
+	pub const fn last_px(mut self, px: f64) -> Self {
 		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
 			body.last_px = Some(px);
+		}
+		self
+	}
+
+	// Order Cancel Request setters
+	pub fn orig_cl_ord_id(mut self, v: impl Into<String>) -> Self {
+		if let FixMessageBody::OrderCancelRequest(body) = &mut self.message.body {
+			body.orig_cl_ord_id = v.into();
+		}
+		self
+	}
+
+	pub fn cancel_cl_ord_id(mut self, v: impl Into<String>) -> Self {
+		// alias for cl_ord_id
+		if let FixMessageBody::OrderCancelRequest(body) = &mut self.message.body {
+			body.cl_ord_id = v.into();
+		}
+		self
+	}
+
+	pub fn cancel_symbol(mut self, v: impl Into<String>) -> Self {
+		if let FixMessageBody::OrderCancelRequest(body) = &mut self.message.body {
+			body.symbol = v.into();
+		}
+		self
+	}
+
+	pub const fn cancel_side(mut self, side: Side) -> Self {
+		if let FixMessageBody::OrderCancelRequest(body) = &mut self.message.body {
+			body.side = side;
+		}
+		self
+	}
+
+	pub const fn cancel_transact_time(mut self, t: OffsetDateTime) -> Self {
+		if let FixMessageBody::OrderCancelRequest(body) = &mut self.message.body {
+			body.transact_time = t;
+		}
+		self
+	}
+
+	pub const fn cancel_order_qty(mut self, q: f64) -> Self {
+		if let FixMessageBody::OrderCancelRequest(body) = &mut self.message.body {
+			body.order_qty = Some(q);
+		}
+		self
+	}
+
+	pub const fn cancel_cash_order_qty(mut self, q: f64) -> Self {
+		if let FixMessageBody::OrderCancelRequest(body) = &mut self.message.body {
+			body.cash_order_qty = Some(q);
+		}
+		self
+	}
+
+	pub fn cancel_account(mut self, v: impl Into<String>) -> Self {
+		if let FixMessageBody::OrderCancelRequest(body) = &mut self.message.body {
+			body.account = Some(v.into());
+		}
+		self
+	}
+
+	pub fn cancel_text(mut self, v: impl Into<String>) -> Self {
+		if let FixMessageBody::OrderCancelRequest(body) = &mut self.message.body {
+			body.text = Some(v.into());
 		}
 		self
 	}
