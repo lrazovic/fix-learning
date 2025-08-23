@@ -5,12 +5,12 @@
 //! body length calculation and checksum generation.
 
 use crate::{
-	FixMessage,
+	FixMessage, OrdStatus,
 	common::{
 		EncryptMethod, FixHeader, FixTrailer, MsgType, Side,
 		validation::{FixFieldHandler, WriteTo},
 	},
-	messages::{FixMessageBody, HeartbeatBody, LogonBody, NewOrderSingleBody},
+	messages::{ExecutionReportBody, FixMessageBody, HeartbeatBody, LogonBody, NewOrderSingleBody},
 };
 
 use time::OffsetDateTime;
@@ -33,6 +33,7 @@ impl FixMessageBuilder {
 			MsgType::Heartbeat => FixMessageBody::Heartbeat(HeartbeatBody::default()),
 			MsgType::Logon => FixMessageBody::Logon(LogonBody::default()),
 			MsgType::NewOrderSingle => FixMessageBody::NewOrderSingle(NewOrderSingleBody::default()),
+			MsgType::ExecutionReport => FixMessageBody::ExecutionReport(ExecutionReportBody::default()),
 			_ => FixMessageBody::Other,
 		};
 
@@ -193,6 +194,77 @@ impl FixMessageBuilder {
 	pub const fn price(mut self, price: f64) -> Self {
 		if let FixMessageBody::NewOrderSingle(body) = &mut self.message.body {
 			body.price = Some(price);
+		}
+		self
+	}
+
+	// Execution Report setters (minimal subset)
+	pub fn order_id(mut self, order_id: impl Into<String>) -> Self {
+		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
+			body.order_id = order_id.into();
+		}
+		self
+	}
+
+	pub fn exec_id(mut self, exec_id: impl Into<String>) -> Self {
+		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
+			body.exec_id = exec_id.into();
+		}
+		self
+	}
+
+	pub fn exec_trans_type(mut self, v: impl Into<String>) -> Self {
+		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
+			body.exec_trans_type = v.into().parse().unwrap_or(body.exec_trans_type.clone());
+		}
+		self
+	}
+
+	pub fn exec_type(mut self, v: impl Into<String>) -> Self {
+		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
+			body.exec_type = v.into().parse().unwrap_or(body.exec_type.clone());
+		}
+		self
+	}
+
+	pub fn ord_status(mut self, v: OrdStatus) -> Self {
+		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
+			body.ord_status = v;
+		}
+		self
+	}
+
+	pub fn leaves_qty(mut self, qty: f64) -> Self {
+		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
+			body.leaves_qty = qty;
+		}
+		self
+	}
+
+	pub fn cum_qty(mut self, qty: f64) -> Self {
+		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
+			body.cum_qty = qty;
+		}
+		self
+	}
+
+	pub fn avg_px(mut self, px: f64) -> Self {
+		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
+			body.avg_px = px;
+		}
+		self
+	}
+
+	pub fn last_shares(mut self, qty: f64) -> Self {
+		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
+			body.last_shares = Some(qty);
+		}
+		self
+	}
+
+	pub fn last_px(mut self, px: f64) -> Self {
+		if let FixMessageBody::ExecutionReport(body) = &mut self.message.body {
+			body.last_px = Some(px);
 		}
 		self
 	}
