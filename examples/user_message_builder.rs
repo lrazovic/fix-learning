@@ -29,11 +29,6 @@ fn main() {
 	.ord_type("1") // 40=1 (OrdType - Market order)
 	.side("1".parse().unwrap()) // 54=1 (Side - Buy) - using FromStr
 	.symbol("AAPL") // 55=AAPL (Symbol)
-	// Custom fields using the field() method
-	.field(21, "2") // 21=2 (HandlInst)
-	.field(60, "20190206-16:25:08.968") // 60=20190206-16:25:08.968 (TransactTime)
-	.field(207, "TO") // 207=TO (SecurityExchange)
-	.field(6000, "TEST1234") // 6000=TEST1234 (Custom field)
 	.build();
 
 	// Serialize to FIX wire format
@@ -70,30 +65,6 @@ fn main() {
 		"10={}                          - CheckSum (calculated automatically)",
 		fix_wire.split('\x01').last().unwrap_or("10=?")
 	);
-
-	// Parse it back to verify
-	println!("\n=== Verification (Parse Back) ===");
-	match FixMessage::from_fix_string(&fix_wire) {
-		Ok(parsed) => {
-			println!("✓ Message parsed successfully!");
-			println!("  Message Type: {:?}", parsed.msg_type);
-			println!("  Sender: {}", parsed.sender_comp_id);
-			println!("  Target: {}", parsed.target_comp_id);
-			println!("  Seq Number: {}", parsed.msg_seq_num);
-			println!("  Client Order ID: {:?}", parsed.cl_ord_id);
-			println!("  Symbol: {:?}", parsed.symbol);
-			println!("  Side: {:?}", parsed.side);
-			println!("  Quantity: {:?}", parsed.order_qty);
-			println!("  Order Type: {:?}", parsed.ord_type);
-			println!("  HandlInst (Tag 21): {:?}", parsed.get_field(21));
-			println!("  TransactTime (Tag 60): {:?}", parsed.get_field(60));
-			println!("  SecurityExchange (Tag 207): {:?}", parsed.get_field(207));
-			println!("  Custom Field (Tag 6000): {:?}", parsed.get_field(6000));
-		},
-		Err(e) => {
-			println!("✗ Parse error: {}", e);
-		},
-	}
 
 	println!("let msg = FixMessage::builder(\"D\".parse().unwrap(), ...)  // NewOrderSingle");
 	println!("  .cl_ord_id(\"ORDER123\")");
